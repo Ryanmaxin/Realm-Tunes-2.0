@@ -8,7 +8,7 @@ import sys, os, asyncio
 
 
 load_dotenv()
-os.system('clear')
+# os.system('clear')
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix = '-', intents = intents, case_insensitive = True)

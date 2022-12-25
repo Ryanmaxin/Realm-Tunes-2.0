@@ -6,10 +6,7 @@ import re
 import os,sys,math
 # from youtube_dl import YoutubeDL
 import wavelink
-
-class Player(wavelink.Player):
-    def __init__(self,*args,**kwargs):
-        super().__init__(*args,**kwargs)
+from time import sleep
 
 class MusicCog(commands.Cog):
     def __init__(self,bot: commands.Bot):
@@ -67,30 +64,32 @@ class MusicCog(commands.Cog):
     async def cog_command_error(self, ctx, error):
         print(ctx,error)
 
-    async def get_player(self,obj):
-        if isinstance(obj, commands.context):
-            self.wavelink.get_player(obj.guild.id,cls=Player,context=obj)
-        elif isinstance(obj, discord.guild):
-            return self.wavelink.get_player(obj.id,cls=Player)
+    # async def get_player(self,obj):
+    #     if isinstance(obj, commands.context):
+    #         self.wavelink.get_player(obj.guild.id,cls=Player,context=obj)
+    #     elif isinstance(obj, discord.guild):
+    #         return self.wavelink.get_player(obj.id,cls=Player)
     
     async def cog_check(self,ctx):
         if isinstance(ctx.channel, discord.DMChannel):
             await ctx.send("Music Commands are not available in DMs.")
             return False
         return True
+    
+    async def cog_load(self):
+        print("Hello world!")
+        await self.connect_nodes()
 
-    async def setup_hook(self):
-        await self.connect_nodes() 
-        # no need to use `loop.run_*` here, you are inside an async function
 
     async def connect_nodes(self):
         """Connect to our Lavalink nodes."""
-        await self.bot.wait_until_ready()
-
-        await wavelink.NodePool.create_node(bot=self. bot,
+        
+        # await self.bot.wait_until_ready()
+        await wavelink.NodePool.create_node(bot=self.bot,
                                             host='127.0.0.1',
                                             port=2333,
-                                            password='youshallnotpass')
+                                            password='youshallnotpass',
+                                            region='US Central')
 
 
     # def nowPlaying(self,ctx,song):
@@ -127,22 +126,24 @@ class MusicCog(commands.Cog):
     #         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     #         print(exc_type, fname, exc_tb.tb_lineno)
             
-    # async def joinVC(self,ctx,channel):
-    #     id = int(ctx.guild.id)
-    #     if self.vc[id] == None or not self.vc[id].is_connected():
-    #         #if not connected to a channel already
-    #         self.vc[id] = await channel.connect()
-    #         if self.vc[id] == None:
-    #             await ctx.send("Unable to connect to the voice channel")
-    #             return
-    #     else: 
-    #         #if already connected to a channel
-    #         await self.vc[id].move_to(channel)
+    async def joinVC(self,ctx,channel):
+        id = int(ctx.guild.id)
+        # node = wavelink.NodePool.get_node()
+        # player = node.get_player(ctx.guild)
+        if self.vc[id] == None or not self.vc[id].is_connected():
+            #if not connected to a channel already
+            self.vc[id] = await channel.connect(cls=wavelink.Player)
+            if self.vc[id] == None:
+                await ctx.send("Unable to connect to the voice channel")
+                return
+        else: 
+            #if already connected to a channel
+            await self.vc[id].move_to(channel)
 
-    # async def reset(self):
-    #     self.is_playing[id] = self.is_paused[id] = False
-    #     self.music_queue[id] = []
-    #     self.queue_index[id] = 0
+    async def reset(self):
+        self.is_playing[id] = self.is_paused[id] = False
+        self.music_queue[id] = []
+        self.queue_index[id] = 0
 
     # def search_YT(self,search):
     #     query_string = parse.urlencode({'search_query': search})
@@ -211,69 +212,97 @@ class MusicCog(commands.Cog):
     #         self.queue_index[id] += 1
     #         self.is_playing[id] = False
 
-    # #Commands
-    # @commands.command(
-    #     name="play",
-    #     aliases=['p'],
-    #     help=""
-    # )
-    # async def play(self,ctx,*args):
-    #     search = " ".join(args)
-    #     id = int(ctx.guild.id)
-    #     try:
-    #         user_channel = ctx.author.voice.channel
-    #     except:
-    #         await ctx.send("You must be connected to a voice channel")
-    #     if not args:
-    #         #No search terms put in
-    #         if len(self.music_queue[id]) == 0:
-    #             await ctx.send("There are no songs to be played in the queue")
-    #             return
-    #         elif not self.is_playing[id]:
-    #             if self.music_queue[id] == None or self.vc[id] == None:
-    #                 await self.playMusic(ctx)
-    #             else:
-    #                 self.is_paused[id] = False
-    #                 self.is_playing[id] = True
-    #                 self.vc[id].resume()
-    #         else:
-    #             return
-    #     else:
-    #         song = self.extract_YT(self.search_YT(search)[0])
-    #         #Song will be a boolean if it failed to return
-    #         if type(song) == type(True):
-    #             await ctx.send("Could not download song, try some different keywords")
-    #         else:
-    #             self.music_queue[id].append([song,user_channel])
-    #             if not self.is_playing[id]:
-    #                 #If not playing music
-    #                 await self.playMusic(ctx)
-    #             else:
-    #                 #If you are playing music
-    #                 message = "Message"
-    #                 await ctx.send(message)
+    #Commands
+    @commands.command(
+        name="play",
+        aliases=['p'],
+        help=""
+    )
+    async def play(self, ctx: commands.Context, *, search: wavelink.YouTubeTrack):
+        try:
+            # print(wavelink.NodePool.get_node())
+            node = wavelink.NodePool.get_node()
+            player = node.get_player(ctx.guild)
+            # print(player)
+            track = await wavelink.YouTubeTrack.search(query="Ocean Man", return_first=True)
+            print(player.is_playing())
+            await player.play(track)
+            await player.set_volume(100)
+            print(player.is_playing())
+            print(player.source)
+            print(node.is_connected())
+            sleep(10)
+            print(player.position)
+            # """Play a song with the given search query.
+            # If not connected, connect to our voice channel.
+            # """
+            # if not ctx.voice_client:
+            #     vc: wavelink.Player = await ctx.author.voice.channel.connect(cls=wavelink.Player)
+            # else:
+            #     vc: wavelink.Player = ctx.voice_client
 
-    # @commands.command(
-    #     name="join",
-    #     aliases=['j'],
-    #     help=""
-    # )
-    # async def join(self,ctx):
-    #     if ctx.author.voice:
-    #         user_channel = ctx.author.voice.channel
-    #         await self.joinVC(ctx,user_channel)
-    #         await ctx.send(f'Realm Tunes joined {user_channel}')
-    #     else:
-    #         await ctx.send("You must be connected to a voice channel")
+            # await vc.play(search)
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, fname, exc_tb.tb_lineno,e)
 
-    # @commands.command(
-    #     name="leave",
-    #     aliases=['l'],
-    #     help=""
-    # )
-    # async def leave(self,ctx):
-    #     id = int(ctx.guild.id)
-    #     await self.reset()
-    #     if self.vc[id] != None:
-    #         await self.vc[id].disconnect()
-    #         await ctx.send("Realm Tunes left the chat")
+        
+        # id = int(ctx.guild.id)
+        # try:
+        #     user_channel = ctx.author.voice.channel
+        # except:
+        #     await ctx.send("You must be connected to a voice channel")
+        # if not args:
+        #     #No search terms put in
+        #     if len(self.music_queue[id]) == 0:
+        #         await ctx.send("There are no songs to be played in the queue")
+        #         return
+        #     elif not self.is_playing[id]:
+        #         if self.music_queue[id] == None or self.vc[id] == None:
+        #             await self.playMusic(ctx)
+        #         else:
+        #             self.is_paused[id] = False
+        #             self.is_playing[id] = True
+        #             self.vc[id].resume()
+        #     else:
+        #         return
+        # else:
+        #     song = self.extract_YT(self.search_YT(search)[0])
+        #     #Song will be a boolean if it failed to return
+        #     if type(song) == type(True):
+        #         await ctx.send("Could not download song, try some different keywords")
+        #     else:
+        #         self.music_queue[id].append([song,user_channel])
+        #         if not self.is_playing[id]:
+        #             #If not playing music
+        #             await self.playMusic(ctx)
+        #         else:
+        #             #If you are playing music
+        #             message = "Message"
+        #             await ctx.send(message)
+
+    @commands.command(
+        name="join",
+        aliases=['j'],
+        help=""
+    )
+    async def join(self,ctx):
+        if ctx.author.voice:
+            user_channel = ctx.author.voice.channel
+            await self.joinVC(ctx,user_channel)
+            await ctx.send(f'Realm Tunes joined {user_channel}')
+        else:
+            await ctx.send("You must be connected to a voice channel")
+
+    @commands.command(
+        name="leave",
+        aliases=['l'],
+        help=""
+    )
+    async def leave(self,ctx):
+        id = int(ctx.guild.id)
+        await self.reset()
+        if self.vc[id] != None:
+            await self.vc[id].disconnect()
+            await ctx.send("Realm Tunes left the chat")
