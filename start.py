@@ -1,24 +1,28 @@
 import discord
-from discord.ext import commands
-import os
+import os 
 from dotenv import load_dotenv
-from music_cog import MusicCog
-import logging
-import sys, os, asyncio
+import asyncio
 
+from discord.ext import commands
 
 load_dotenv()
-# os.system('clear')
-
-intents = discord.Intents.all()
-bot = commands.Bot(command_prefix = '-', intents = intents, case_insensitive = True)
 password = str(os.getenv("bot_key"))
 
-logging.basicConfig(stream=sys.stdout, level=logging.CRITICAL)
+bot = commands.Bot(command_prefix = '-', intents = discord.Intents.all(), case_insensitive = True)
+
+async def load_extensions():
+    for filename in os.listdir("./cogs"):
+        if filename.endswith(".py"):
+            # cut off the .py from the file name
+            await bot.load_extension(f"cogs.{filename[:-3]}")
+
+@bot.event
+async def on_ready():
+    print("Bot is ready!")
 
 async def main():
-    await bot.add_cog(MusicCog(bot))
-    await bot.start(password, reconnect=True)
+    async with bot:
+        await load_extensions()
+        await bot.start(password)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+asyncio.run(main())

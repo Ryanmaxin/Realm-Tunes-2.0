@@ -11,6 +11,7 @@ from time import sleep
 class MusicCog(commands.Cog):
     def __init__(self,bot: commands.Bot):
         self.bot = bot
+        bot.loop.create_task(self.create_nodes())
         
         #Allow the bot to play on multiple servers
         self.is_playing = {}
@@ -76,20 +77,17 @@ class MusicCog(commands.Cog):
             return False
         return True
     
-    async def cog_load(self):
-        print("Hello world!")
-        await self.connect_nodes()
 
 
-    async def connect_nodes(self):
+    async def create_nodes(self):
         """Connect to our Lavalink nodes."""
         
-        # await self.bot.wait_until_ready()
+        await self.bot.wait_until_ready()
         await wavelink.NodePool.create_node(bot=self.bot,
                                             host='127.0.0.1',
                                             port=2333,
-                                            password='youshallnotpass',
-                                            region='US Central')
+                                            password='youshallnotpass')
+        
 
 
     # def nowPlaying(self,ctx,song):
@@ -219,20 +217,26 @@ class MusicCog(commands.Cog):
         help=""
     )
     async def play(self, ctx: commands.Context, *, search: wavelink.YouTubeTrack):
-        try:
-            # print(wavelink.NodePool.get_node())
-            node = wavelink.NodePool.get_node()
-            player = node.get_player(ctx.guild)
-            # print(player)
-            track = await wavelink.YouTubeTrack.search(query="Ocean Man", return_first=True)
-            print(player.is_playing())
-            await player.play(track)
-            await player.set_volume(100)
-            print(player.is_playing())
-            print(player.source)
-            print(node.is_connected())
-            sleep(10)
-            print(player.position)
+        if not ctx.voice_client:
+            vc: wavelink.Player = await ctx.author.voice.channel.connect(cls=wavelink.Player)
+        else:
+            vc: wavelink.Player = ctx.voice_client
+
+        if vc.queue.is_empty and not vc.is_playing():
+            print(vc.node.is_connected())
+
+        node = wavelink.NodePool.get_node()
+        player = node.get_player(ctx.guild)
+        print("Node: ", wavelink.NodePool.get_node())
+        print("Node connected? ", vc.node.is_connected())
+        print("Player: ", player)
+
+        print("is_playing before? ", player.is_playing())
+        await player.play(search)
+        await player.set_volume(100)
+        print("is_playing after? ", player.is_playing())
+        print("Song: ", player.source)
+
             # """Play a song with the given search query.
             # If not connected, connect to our voice channel.
             # """
@@ -242,10 +246,6 @@ class MusicCog(commands.Cog):
             #     vc: wavelink.Player = ctx.voice_client
 
             # await vc.play(search)
-        except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            print(exc_type, fname, exc_tb.tb_lineno,e)
 
         
         # id = int(ctx.guild.id)
@@ -306,3 +306,6 @@ class MusicCog(commands.Cog):
         if self.vc[id] != None:
             await self.vc[id].disconnect()
             await ctx.send("Realm Tunes left the chat")
+
+async def setup(bot):
+    await bot.add_cog(MusicCog(bot))
