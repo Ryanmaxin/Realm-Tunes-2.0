@@ -2,6 +2,8 @@ import discord
 import os 
 from dotenv import load_dotenv
 import asyncio
+import logging
+import sys
 
 from discord.ext import commands
 
@@ -16,13 +18,10 @@ async def load_extensions():
             # cut off the .py from the file name
             await bot.load_extension(f"cogs.{filename[:-3]}")
 
-@bot.event
-async def on_ready():
-    print("Bot is ready!")
-
 async def main():
     async with bot:
         await load_extensions()
         await bot.start(password)
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
