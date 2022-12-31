@@ -175,53 +175,67 @@ class Music(commands.Cog):
         mbed = discord.Embed(title=f"Now Playing {search}", color=discord.Color.from_rgb(255, 255, 255))
         await ctx.send(embed=mbed)
     
-    @commands.command(name="stop")
+    @commands.command(
+        name="stop",
+        aliases=['s'],
+        help=""
+    )
     async def stop_command(self, ctx: commands.Context):
-        node = wavelink.NodePool.get_node()
-        player = node.get_player(ctx.guild)
+        player = self.node.get_player(ctx.guild)
 
-        if player is None:
-            return await ctx.send("Bot is not connected to any voice channel")
+        if player == None:
+            await ctx.send("Bot is not connected to any voice channel")
+            return 
         
         if player.is_playing:
             await player.stop()
-            mbed = discord.Embed(title="Playback Stoped", color=discord.Color.from_rgb(255, 255, 255))
-            return await ctx.send(embed=mbed)
+            await ctx.send("Playback stopped")
         else:
-            return await ctx.send("Nothing Is playing right now")
+            await ctx.send("Nothing Is playing right now")
+            return 
     
-    @commands.command(name="pause")
+    @commands.command(
+        name="pause",
+        aliases=['p'],
+        help=""
+    )
     async def pause_command(self, ctx: commands.Context):
-        node = wavelink.NodePool.get_node()
-        player = node.get_player(ctx.guild)
+        player = self.node.get_player(ctx.guild)
 
         if player is None:
-            return await ctx.send("Bot is not connected to any voice channel")
+            await ctx.send("Bot is not connected to any voice channel")
+            return 
         
         if not player.is_paused():
             if player.is_playing():
                 await player.pause()
-                mbed = discord.Embed(title="Playback Paused", color=discord.Color.from_rgb(255, 255, 255))
-                return await ctx.send(embed=mbed)
+                await ctx.send("Playback Paused")
+                
             else:
-                return await ctx.send("Nothing is playing right now")
+                await ctx.send("Nothing is playing right now")
+                return 
         else:
-            return await ctx.send("Playback is Already paused")
+            await ctx.send("Playback is Already paused")
+            return
     
-    @commands.command(name="resume")
+    @commands.command(
+        name="resume",
+        aliases=['r'],
+        help=""
+    )
     async def resume_command(self, ctx: commands.Context):
-        node = wavelink.NodePool.get_node()
-        player = node.get_player(ctx.guild)
+        player = self.node.get_player(ctx.guild)
 
         if player is None:
-            return await ctx.send("bot is not connnected to any voice channel")
+            await ctx.send("Bot is not connnected to any voice channel")
+            return
         
         if player.is_paused():
             await player.resume()
-            mbed = discord.Embed(title="Playback resumed", color=discord.Color.from_rgb(255, 255, 255))
-            return await ctx.send(embed=mbed)
+            await ctx.send("Playback resumed")
         else:
-            return await ctx.send("playback is not paused")
+            await ctx.send("playback is not paused")
+            return
 
     @commands.command(
         name="volume",
