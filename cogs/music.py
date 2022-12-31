@@ -35,27 +35,14 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
-        try:
-            player = self.node.get_player(member.guild)
-            if not member.bot and before.channel != None and after.channel != before.channel:
-                remaining_channel_members = before.channel.members
-                if len(remaining_channel_members) == 1 and remaining_channel_members[0].bot and player.is_connected():
-                    await player.disconnect()
-                    join_context = self.join_context[id]
-                    await join_context.channel.send(f"Realm Tunes left because there were no members left in ``{before.channel}``")
-        except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            print(exc_type, fname, exc_tb.tb_lineno,e)
+        player = self.node.get_player(member.guild)
+        if not member.bot and before.channel != None and after.channel != before.channel:
+            remaining_channel_members = before.channel.members
+            if len(remaining_channel_members) == 1 and remaining_channel_members[0].bot and player.is_connected():
+                await player.disconnect()
+                join_context = self.join_context[id]
+                await join_context.channel.send(f"Realm Tunes left because there were no members remaining in ``{before.channel}``")
 
-        # bot= self.bot.user.id
-        # if member.id != bot and before.channel != None and after.channel != before.channel:
-        #     remaining_channel_members = before.channel.members
-        #     if len(remaining_channel_members) == 1 and remaining_channel_members[0].id == bot and self.vc[id].is_connected():
-        #         await self.reset()
-        #         await self.vc[id].disconnect()
-        #         join_context = self.join_context[id]
-        #         await join_context.channel.send(f"Realm Tunes left because there were no members left in ``{before.channel}``")
 
     @commands.Cog.listener()
     async def on_wavelink_node_ready(self, node: wavelink.Node):
@@ -65,9 +52,7 @@ class Music(commands.Cog):
 
     #Helper functions
     async def cog_command_error(self, ctx, error):
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print(exc_type, fname, exc_tb.tb_lineno,error)
+        print(error)
     
     async def cog_check(self,ctx):
         if isinstance(ctx.channel, discord.DMChannel):
@@ -95,15 +80,17 @@ class Music(commands.Cog):
                                             region='US CENTRAL')
     
     async def joinVC(self,ctx, channel):
+        result = None
         player = self.node.get_player(ctx.guild)
         if player is not None and player.is_connected():
             await player.move_to(channel)
         else:
             result = await channel.connect(cls=wavelink.Player)
             if result == None:
-                await ctx.send("Unable to connect to the voice channel")
-                return
+                return result
         self.join_context[id] = ctx
+        result = True
+        return result
 
 
     @commands.command(
@@ -114,8 +101,11 @@ class Music(commands.Cog):
     async def join_command(self, ctx: commands.Context):
         if ctx.author.voice:
             user_channel = ctx.author.voice.channel
-            await self.joinVC(ctx,user_channel)
-            await ctx.send(f'Realm Tunes joined ``{user_channel}``')
+            result = await self.joinVC(ctx,user_channel)
+            if result == None:
+                await ctx.send("Unable to connect to the voice channel")
+            else:
+                await ctx.send(f'Realm Tunes joined ``{user_channel}``')
         else:
             await ctx.send("You must be connected to a voice channel")
 
@@ -130,26 +120,57 @@ class Music(commands.Cog):
         if player is None:
             await ctx.send("Realm Tunes is not connected to any voice channel")
             return
-        
         await player.disconnect()
-        if player is None:
-            await ctx.send("Realm Tunes left the chat")
+        await ctx.send("Realm Tunes left the chat")
+    
+    @commands.command(
+        name="play",
+        aliases=['p'],
+        help=""
+    )
+    async def play_command(self, ctx: commands.Context, *, query: str=""):
+        if len(query) == 0:
+            await ctx.send("Please enter a search term")
+            return
+        search = await wavelink.YouTubeTrack.search(query=query, return_first=True)
+        if ctx.author.voice:
+            user_channel = ctx.author.voice.channel
+            result = await self.joinVC(ctx,user_channel)
+            if result == None:
+                await ctx.send("Unable to connect to the voice channel to play music")
+                return
         else:
-            await ctx.send("Unable to disconnect from the voice channel")
-            
-        mbed = discord.Embed(title="Disconnected", color=discord.Color.from_rgb(255, 255, 255))
+            await ctx.send("You must be connected to a voice channel to play music")
+            return
+        
+        player = player = self.node.get_player(ctx.guild)
+        await player.play(search)
+
+        mbed = discord.Embed(title=f"Now Playing {search}", color=discord.Color.from_rgb(255, 255, 255))
         await ctx.send(embed=mbed)
     
-    @commands.command(name="play")
-    async def play_command(self, ctx: commands.Context, *, search: str):
-        search = await wavelink.YouTubeTrack.search(query=search, return_first=True)
-
-        if not ctx.voice_client:
-            vc: wavelink.Player = await ctx.author.voice.channel.connect(cls=wavelink.Player)
+    @commands.command(
+        name="soundcloud_play",
+        aliases=['scp'],
+        help=""
+    )
+    async def soundcloud_play_command(self, ctx: commands.Context, *, query: str=""):
+        if len(query) == 0:
+            await ctx.send("Please enter a search term")
+            return
+        search = await wavelink.SoundCloudTrack.search(query=query, return_first=True)
+        if ctx.author.voice:
+            user_channel = ctx.author.voice.channel
+            result = await self.joinVC(ctx,user_channel)
+            if result == None:
+                await ctx.send("Unable to connect to the voice channel to play music")
+                return
         else:
-            vc: wavelink.Player = ctx.voice_client
+            await ctx.send("You must be connected to a voice channel to play music")
+            return
         
-        await vc.play(search)
+        player = player = self.node.get_player(ctx.guild)
+        await player.play(search)
 
         mbed = discord.Embed(title=f"Now Playing {search}", color=discord.Color.from_rgb(255, 255, 255))
         await ctx.send(embed=mbed)
@@ -202,31 +223,33 @@ class Music(commands.Cog):
         else:
             return await ctx.send("playback is not paused")
 
-    @commands.command(name="volume")
-    async def volume_command(self, ctx: commands.Context, to: int):
-        if to > 1000:
-            return await ctx.send("Volume should be between 0 and 1000")
-        elif to < 1:
-            return await ctx.send("Volume should be between 0 and 1000")
-        
-
-        node = wavelink.NodePool.get_node()
-        player = node.get_player(ctx.guild)
-
-        await player.set_volume(to)
-        mbed = discord.Embed(title=f"Changed Volume to {to}", color=discord.Color.from_rgb(255, 255, 255))
-        await ctx.send(embed=mbed)
-    
     @commands.command(
-        name="connected",
-        aliases=['con'],
+        name="volume",
+        aliases=['v'],
         help=""
     )
-    async def connected(self, ctx):
-        node = wavelink.NodePool.get_node()
-        player = node.get_player(ctx.guild)
-        print("connected?",player.is_connected())
+    async def volume_command(self, ctx: commands.Context, to=None):
+        
+        
+        try:
+            to = int(to)
+        except:
+            await ctx.send("Volume must be a whole number between 0 and 1000 (ex: 50)")
+            return 
+        if to > 1000:
+            await ctx.send("Volume must be between 0 and 1000")
+            return
+        elif to < 1:
+            await ctx.send("Volume must be between 0 and 1000")
+            return
+        elif to > 100:
+            embed = discord.Embed(title=f"Warning: setting volume over 100% is not recommended. Please be careful!", color=self.EMBED_RED)
+            await ctx.send(embed=embed)
 
+        player = self.node.get_player(ctx.guild)
+        await player.set_volume(to)
+        await ctx.send(f"Set volume to {to}%")
+    
 async def setup(bot):
     await bot.add_cog(Music(bot))
     print("Loaded music cog")
