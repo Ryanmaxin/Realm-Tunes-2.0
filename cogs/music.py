@@ -33,6 +33,7 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
+        id = int(member.guild.id)
         player: wavelink.Player = member.guild.voice_client
         if not member.bot and before.channel != None and after.channel != before.channel:
             remaining_channel_members = before.channel.members
@@ -49,8 +50,19 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_wavelink_track_end(self, player: wavelink.Player, track, reason):
-        ctx = self.join_context
-        if str(reason) == "FINISHED":
+        try:
+            id = int(player.guild.id)
+            ctx = self.join_context[id]
+            if not str(reason) == "FINISHED":
+                embed = discord.Embed(title=f"Something went wrong while playing: {track.title}", color=self.EMBED_RED)
+                await ctx.send(embed=embed)
+                vars = {
+                        "player": player,
+                        "reason": reason,
+                        "queue": player.queue,
+                    }
+                await self.sendDM("on_wavelink_track_end",vars)
+                return
             if not player.queue.is_empty:
                 new = await player.queue.get_wait()
                 try:
@@ -70,15 +82,10 @@ class Music(commands.Cog):
                 await ctx.send(embed=embed)
             else:
                 await player.stop()
-        else:
-            embed = discord.Embed(title=f"Something went wrong while playing: {track.title}", color=self.EMBED_RED)
-            await ctx.send(embed=embed)
-            vars = {
-                    "player": player,
-                    "reason": reason,
-                    "queue": player.queue,
-                }
-            await self.sendDM("on_wavelink_track_end",vars)
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, fname, exc_tb.tb_lineno)
 
     #Helper functions
     async def cog_command_error(self, ctx, error):
@@ -91,7 +98,6 @@ class Music(commands.Cog):
         return True
     
     def nowPlaying(self,ctx,track):
-        id = int(ctx.guild.id)
         title = track.title
         duration = self.convertDuration(track.duration)
         link = track.uri
@@ -103,7 +109,25 @@ class Music(commands.Cog):
             description = f'[{title}]({link}) ({duration})',
             colour = self.EMBED_GREEN
         )
-        if self.play_mode == "youtube":
+        if type(track) == wavelink.YouTubeTrack:
+            thumbnail = track.thumbnail
+            embed.set_thumbnail(url=thumbnail)
+        embed.set_footer(text=f'Song added by {str(author)}',icon_url=avatar)
+        return embed
+    
+    def addedToQueue(self,ctx,track,qlen):
+        title = track.title
+        duration = self.convertDuration(track.duration)
+        link = track.uri
+        author = ctx.author
+        avatar = author.avatar.url
+
+        embed = discord.Embed(
+            title = f"Added to Queue ({qlen})",
+            description = f'[{title}]({link}) ({duration})',
+            colour = self.EMBED_GREEN
+        )
+        if type(track) == wavelink.YouTubeTrack:
             thumbnail = track.thumbnail
             embed.set_thumbnail(url=thumbnail)
         embed.set_footer(text=f'Song added by {str(author)}',icon_url=avatar)
@@ -136,6 +160,7 @@ class Music(commands.Cog):
                                             region='US CENTRAL')
     
     async def joinVC(self,ctx, channel):
+        id = int(ctx.guild.id)
         result = None
         player: wavelink.Player = ctx.voice_client
         if player is not None and player.is_connected():
@@ -147,6 +172,60 @@ class Music(commands.Cog):
         self.join_context[id] = ctx
         result = True
         return result
+    async def search(self,ctx,query):
+        id = int(ctx.guild.id)
+        if len(query) == 0:
+            await ctx.send("Please enter a search term")
+            return
+        try:
+            if self.play_mode[id] == "youtube":
+                search = await wavelink.YouTubeTrack.search(query=query, return_first=True)
+            elif self.play_mode[id] == "soundcloud":
+                search = await wavelink.SoundCloudTrack.search(query=query, return_first=True)
+        except IndexError:
+            await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
+            return
+        except Exception as e:
+            embed = discord.Embed(title=f"Something went wrong while searching for: {query}", color=self.EMBED_RED)
+            await ctx.send(embed=embed)
+            vars = {
+                    "error": e,
+                    "query": query,
+                }
+            await self.sendDM("play_command",vars)
+            return
+        return search
+
+    async def validatePlay(self,ctx):
+        if ctx.author.voice:
+            user_channel = ctx.author.voice.channel
+            result = await self.joinVC(ctx,user_channel)
+            if result == None:
+                embed = discord.Embed(title=f"Something went wrong while connecting to the voice channel!", color=self.EMBED_RED)
+                await ctx.send(embed=embed)
+                vars = {
+                    "user_channel": user_channel,
+                    "result": result
+                }
+                await self.sendDM("play",vars)
+                return False
+        else:
+            await ctx.send("You must be connected to a voice channel to play music")
+            return False
+        return True
+    
+    async def playSong(self,ctx,search,player):
+        await player.play(search)
+        embed = self.nowPlaying(ctx,search)
+        await ctx.send(embed=embed)
+
+    async def addToQueue(self,ctx,search,player):
+        player.queue.put(search)
+        len = player.queue.count
+        embed = self.addedToQueue(ctx,search,len)
+        await ctx.send(embed=embed)
+
+
 
 
     @commands.command(
@@ -159,7 +238,7 @@ class Music(commands.Cog):
             user_channel = ctx.author.voice.channel
             result = await self.joinVC(ctx,user_channel)
             if result == None:
-                embed = discord.Embed(title=f"Something went wrong while connecting to this voice channel!", color=self.EMBED_RED)
+                embed = discord.Embed(title=f"Something went wrong while connecting to the voice channel!", color=self.EMBED_RED)
                 await ctx.send(embed=embed)
                 vars = {
                     "user_channel": user_channel,
@@ -191,46 +270,20 @@ class Music(commands.Cog):
         help=""
     )
     async def play_command(self, ctx: commands.Context, *, query: str=""):
-        id = int(ctx.guild.id)
-        if len(query) == 0:
-            await ctx.send("Please enter a search term")
-            return
-        try:
-            if self.play_mode[id] == "youtube":
-                search = await wavelink.YouTubeTrack.search(query=query, return_first=True)
-            elif self.play_mode[id] == "soundcloud":
-                search = await wavelink.SoundCloudTrack.search(query=query, return_first=True)
-        except IndexError:
-            await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
-            return
-        except Exception as e:
-            embed = discord.Embed(title=f"Something went wrong while searching for: {query}", color=self.EMBED_RED)
-            await ctx.send(embed=embed)
-            vars = {
-                    "error": e,
-                    "query": query,
-                }
-            await self.sendDM("play_command",vars)
-            return
-        if ctx.author.voice:
-            user_channel = ctx.author.voice.channel
-            result = await self.joinVC(ctx,user_channel)
-            if result == None:
-                await ctx.send("Unable to connect to the voice channel to play music")
-                return
-        else:
-            await ctx.send("You must be connected to a voice channel to play music")
+        search = await self.search(ctx,query)
+        if not await self.validatePlay(ctx):
             return
         
         player: wavelink.Player = ctx.voice_client
-        await player.play(search)
+        if player.is_playing() or player.is_paused():
+            await self.addToQueue(ctx,search,player)
+        else:
+            await self.playSong(ctx,search,player)
 
-        embed = self.nowPlaying(ctx,search)
-        await ctx.send(embed=embed)
     
     @commands.command(
-        name="stop",
-        aliases=['s'],
+        name="clear",
+        aliases=['c'],
         help=""
     )
     async def stop_command(self, ctx: commands.Context):
@@ -242,12 +295,10 @@ class Music(commands.Cog):
         if not player.is_playing():
             await ctx.send("Nothing is playing right now")
             return 
-        if player.is_playing:
-            await player.stop()
-            await ctx.send("Playback stopped")
-        else:
-            await ctx.send("Nothing Is playing right now")
-            return 
+
+        await player.stop()
+        player.queue.clear()
+        await ctx.send("Playback stopped")
     
     @commands.command(
         name="pause",
@@ -297,8 +348,6 @@ class Music(commands.Cog):
         help=""
     )
     async def volume_command(self, ctx: commands.Context, to=None):
-        
-        
         try:
             to = int(to)
         except:
