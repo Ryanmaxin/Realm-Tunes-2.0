@@ -50,42 +50,38 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_wavelink_track_end(self, player: wavelink.Player, track, reason):
-        try:
-            id = int(player.guild.id)
-            ctx = self.join_context[id]
-            if not str(reason) == "FINISHED":
-                embed = discord.Embed(title=f"Something went wrong while playing: {track.title}", color=self.EMBED_RED)
+        id = int(player.guild.id)
+        ctx = self.join_context[id]
+        if not str(reason) == "FINISHED" and not str(reason) == "STOPPED":
+            print("bruh")
+            embed = discord.Embed(title=f"Something went wrong while playing: {track.title}", color=self.EMBED_RED)
+            await ctx.send(embed=embed)
+            vars = {
+                    "player": player,
+                    "reason": reason,
+                    "queue": player.queue,
+                }
+            await self.sendDM("on_wavelink_track_end",vars)
+            return
+        if not player.queue.is_empty:
+            new = await player.queue.get_wait()
+            try:
+                await player.play(new)
+            except Exception as e:
+                embed = discord.Embed(title=f"Something went wrong while playing: {new.title}", color=self.EMBED_RED)
                 await ctx.send(embed=embed)
                 vars = {
                         "player": player,
                         "reason": reason,
                         "queue": player.queue,
+                        "error": e
                     }
-                await self.sendDM("on_wavelink_track_end",vars)
                 return
-            if not player.queue.is_empty:
-                new = await player.queue.get_wait()
-                try:
-                    await player.play(new)
-                except Exception as e:
-                    embed = discord.Embed(title=f"Something went wrong while playing: {new.title}", color=self.EMBED_RED)
-                    await ctx.send(embed=embed)
-                    vars = {
-                            "player": player,
-                            "reason": reason,
-                            "queue": player.queue,
-                            "error": e
-                        }
-                    return
 
-                embed = self.nowPlaying(ctx,new)
-                await ctx.send(embed=embed)
-            else:
-                await player.stop()
-        except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            print(exc_type, fname, exc_tb.tb_lineno)
+            embed = self.nowPlaying(ctx,new)
+            await ctx.send(embed=embed)
+        else:
+            await player.stop()
 
     #Helper functions
     async def cog_command_error(self, ctx, error):
@@ -143,7 +139,6 @@ class Music(commands.Cog):
     async def sendDM(self,func,vars: dict):
         user = await self.bot.fetch_user(404491098946273280)
         message = f"Error in: {func}"
-        await user.send(f"Error in: {func}")
         for var in vars:
             message += f"\n{var}: {vars[var]}"
         await user.send(message)
@@ -286,7 +281,7 @@ class Music(commands.Cog):
         aliases=['c'],
         help=""
     )
-    async def stop_command(self, ctx: commands.Context):
+    async def clear_command(self, ctx: commands.Context):
         player: wavelink.Player = ctx.voice_client
 
         if player == None:
@@ -342,6 +337,48 @@ class Music(commands.Cog):
             await ctx.send("Playback is not paused")
             return
 
+    @commands.command(
+        name="skip",
+        aliases=['s'],
+        help=""
+    )
+    async def skip_command(self, ctx: commands.Context):
+        player: wavelink.Player = ctx.voice_client
+        await ctx.send(f"Skipped track: {player.track.title}")
+        await player.stop()
+
+    @commands.command(
+        name="display_queue",
+        aliases=['q','dq'],
+        help=""
+    )
+    async def display_queue_command(self, ctx: commands.Context):
+        player: wavelink.Player = ctx.voice_client
+        if player is None:
+            await ctx.send("Ream Tunes must be connected to a channel to display the queue")
+            return
+        queue = player.queue
+        if queue.is_empty:
+            await ctx.send("The queue is empty")
+            return
+        i = 1
+        message=""
+        for track in queue:
+            title = track.title
+            duration = self.convertDuration(track.duration)
+            link = track.uri
+            message += f"({i}) [{title}]({link}) ({duration})\n"
+            i+=1
+        embed = discord.Embed(
+            title = f"Music Queue",
+            description = message,
+            colour = self.EMBED_GREEN
+        )
+        
+        await ctx.send(embed=embed)
+
+
+            
     @commands.command(
         name="volume",
         aliases=['v'],
