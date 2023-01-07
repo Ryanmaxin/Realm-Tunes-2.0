@@ -57,7 +57,10 @@ class Music(commands.Cog):
         try:
             id = int(player.guild.id)
             ctx = self.join_context[id]
-            if not str(reason) == "FINISHED" and not str(reason) == "STOPPED" and not str(reason) == "REPLACED":
+            if str(reason) == "REPLACED":
+                print("right path")
+                return
+            if not str(reason) == "FINISHED" and not str(reason) == "STOPPED":
                 embed = discord.Embed(title=f"Something went wrong while playing: {track.title}", color=self.EMBED_RED)
                 await ctx.send(embed=embed)
                 vars = {
@@ -69,7 +72,9 @@ class Music(commands.Cog):
                 return
             if self.is_looping[id]:
                 await self.playSong(ctx,track,player)
+                return
             if not player.queue.is_empty:
+                print("A song finished playing")
                 new = await player.queue.get_wait()
                 await self.playSong(ctx,new,player)
             else:
@@ -129,7 +134,10 @@ class Music(commands.Cog):
         minutes = str(math.floor(duration/60))
         seconds = str(int(duration%60))
         if len(seconds) == 1:
-            seconds = seconds + "0"
+            if minutes == "0":
+                seconds = "0" + seconds
+            else:
+                seconds = seconds + "0"
         return f"{minutes}:{seconds}"
 
     async def sendDM(self,func,vars: dict):
@@ -424,7 +432,7 @@ class Music(commands.Cog):
         if player is None:
             await ctx.send("Realm Tunes must be connected to a channel to skip a track")
             return
-        if player.queue.is_empty:
+        if player.queue.is_empty and not player.is_playing():
             await ctx.send("The queue is empty")
             return
         await ctx.send(f"Skipped track: {player.track.title}")
@@ -469,6 +477,10 @@ class Music(commands.Cog):
         player: wavelink.Player = ctx.voice_client
         if player == None:
             await ctx.send("Realm Tunes must be connected to a channel to loop a song")
+            return
+        if not player.is_playing():
+            await ctx.send("Nothing is playing right now")
+            return 
         id = int(ctx.guild.id)
         self.is_looping[id] = not self.is_looping[id]
         if self.is_looping[id]:
