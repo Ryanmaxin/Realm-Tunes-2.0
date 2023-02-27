@@ -15,6 +15,7 @@ class Music(commands.Cog):
 
         self.join_context = {}
         self.is_looping = {}
+        self.is_repeating_playlist = {}
 
         self.EMBED_BLUE = 0x2c6dd
         self.EMBED_RED = 0xdf1141
@@ -27,6 +28,7 @@ class Music(commands.Cog):
         for guild in self.bot.guilds:
             id = int(guild.id)
             self.is_looping[id] = False
+            self.is_repeating_playlist[id] = False
         print("Bot Online")
 
     @commands.Cog.listener()
@@ -39,6 +41,7 @@ class Music(commands.Cog):
                 await player.disconnect()
                 join_context = self.join_context[id]
                 self.is_looping[id] = False
+                self.is_repeating_playlist[id] = False
                 await join_context.channel.send(f"Realm Tunes left because there were no members remaining in ``{before.channel}``")
 
 
@@ -68,6 +71,8 @@ class Music(commands.Cog):
             await player.seek(0)
             return
         if not player.queue.is_empty:
+            if self.is_repeating_playlist[id]:
+                await player.queue.put_wait(track)
             new = await player.queue.get_wait()
             await self.playSong(ctx,new,player)
         else:
@@ -285,6 +290,10 @@ class Music(commands.Cog):
     
     async def playSong(self,ctx,search,player):
         try:
+            #Inefficent, but it allows the queue to record history for the first song
+            if not (player.is_playing() or player.is_paused()):
+                await player.queue.put_wait(search)
+                await player.queue.get_wait()
             track = await player.play(search)
             embed = self.nowPlaying(ctx,track)
             await ctx.send(embed=embed)
@@ -390,6 +399,7 @@ class Music(commands.Cog):
             return
         await player.disconnect()
         self.is_looping[id] = False
+        self.is_repeating_playlist[id] = False
         await ctx.send("Realm Tunes left the chat")
     
     @commands.command(
@@ -495,7 +505,7 @@ class Music(commands.Cog):
             try:
                 await ctx.send(embed=embed)
             except:
-                embed = discord.Embed(title=f"There are only {pages} pages in the queue", color=self.EMBED_RED)
+                embed = discord.Embed(title=f"There are only {pages} page(s) in the queue", color=self.EMBED_RED)
                 await ctx.send(embed=embed)
         except Exception as e:
             embed = discord.Embed(title=f"Something went wrong while displaying the queue", color=self.EMBED_RED)
@@ -542,6 +552,66 @@ class Music(commands.Cog):
         if (seconds <=0 or seconds >= length):
             seconds = 0
         await player.seek(seconds*1000)
+
+    @commands.command(
+        name="previous",
+        aliases=["pp","prev"],
+        help=""
+    )
+    async def previous_command(self, ctx: commands.Context, now=""):
+        try:
+            player: wavelink.Player = ctx.voice_client
+            if not (await self.validatePlay(ctx)):
+                return
+            try:
+                previous = player.queue.history[0]
+
+                is_playingnow = False
+                if now == "now":
+                    is_playingnow = True
+                await self.route(ctx,previous,player,is_playingnow)
+            except:
+                await ctx.send(f"No previous song found")
+            
+        except Exception as e:
+            embed = discord.Embed(title=f"Something went wrong while displaying the queue", color=self.EMBED_RED)
+            await ctx.send(embed=embed)
+            error = traceback.format_exc()
+            print(error)
+            # vars = {
+            #         "error": e,
+            #         "query": query,
+            #     }
+            await self.sendDM("display_queue_command",error)
+            return
+        
+
+    @commands.command(
+        name="loop",
+        aliases=[],
+        help=""
+    )
+    async def loop_command(self, ctx: commands.Context):
+        player: wavelink.Player = ctx.voice_client
+        if not (await self.validate(ctx,player)):
+            return
+        id = int(ctx.guild.id)
+        self.is_repeating_playlist[id] = not self.is_repeating_playlist[id]
+        if self.is_repeating_playlist[id]:
+            await ctx.send(f"Now looping the queue")
+        else:
+            await ctx.send(f"No longer looping the queue")
+
+    @commands.command(
+        name="shuffle",
+        aliases=["shuf","sh"],
+        help=""
+    )
+    async def shuffle_command(self, ctx: commands.Context, to):
+        player: wavelink.Player = ctx.voice_client
+        if not (await self.validate(ctx,player)):
+            return
+        pass
         
 
     @commands.command(
