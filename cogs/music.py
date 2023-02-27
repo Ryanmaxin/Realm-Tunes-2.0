@@ -119,21 +119,27 @@ class Music(commands.Cog):
         embed.set_footer(text=f'Song added by {str(author)}',icon_url=avatar)
         return embed
 
-    def addedPlaylistToQueue(self,ctx,playlist,qlen):
-        name = playlist.name
-        length = len(playlist.tracks)
-        author = ctx.author
-        avatar = author.avatar.url
-
-        embed = discord.Embed(
-            title = f"Added to Queue ({qlen})",
-            description = f'{name} ({length})',
-            colour = self.EMBED_GREEN
-        )
-        thumbnail = playlist.thumbnail
-        embed.set_thumbnail(url=thumbnail)
-        embed.set_footer(text=f'Playlist added by {str(author)}',icon_url=avatar)
-        return embed
+    def addedPlaylistToQueue(self,ctx,playlist,url,img):
+        try:
+            title = playlist.name
+            length = len(playlist.tracks)
+            link = url
+            author = ctx.author
+            avatar = author.avatar.url
+            embed = discord.Embed(
+                title = f"Playlist Added to Queue",
+                description = f'[{title}]({url}) ({length} songs)',
+                colour = self.EMBED_GREEN
+            )
+            thumbnail = img
+            embed.set_thumbnail(url=thumbnail)
+            embed.set_footer(text=f'Playlist added by {str(author)}',icon_url=avatar)
+            return embed
+        except Exception as e:
+            error = traceback.format_exc()
+            print(error)
+            print(e)
+            return
 
     def convertDuration(self, duration):
         minutes = str(math.floor(duration/60))
@@ -279,8 +285,8 @@ class Music(commands.Cog):
     
     async def playSong(self,ctx,search,player):
         try:
-            await player.play(search)
-            embed = self.nowPlaying(ctx,search)
+            track = await player.play(search)
+            embed = self.nowPlaying(ctx,track)
             await ctx.send(embed=embed)
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -290,16 +296,18 @@ class Music(commands.Cog):
     async def addToQueue(self,ctx,search,player):
         await player.queue.put_wait(search)
         len = player.queue.count
-        embed = self.addedSongToQueue(ctx,search,len)
-        await ctx.send(embed=embed)
+        if type(search) != wavelink.tracks.PartialTrack:
+            embed = self.addedSongToQueue(ctx,search,len)
+            await ctx.send(embed=embed)
+
     
-    async def route(self,ctx,track,player,is_playnow = False):
-        if player.is_playing() or player.is_paused() and not is_playnow:
+    async def route(self,ctx,track,player,is_playnow):
+        if (player.is_playing() or player.is_paused()) and not is_playnow:
             await self.addToQueue(ctx,track,player)
         else:
             await self.playSong(ctx,track,player)
     
-    async def omniPlayer(self,ctx,query,is_playnow = False):
+    async def omniPlayer(self,ctx,query,is_playnow):
         try:
             if len(query) == 0:
                 await ctx.send("Please enter a search term")
@@ -316,8 +324,13 @@ class Music(commands.Cog):
                 if "playlist?" in query:
                     #PLAYLIST TECH
                     playlist = await wavelink.YouTubePlaylist.search(query=query)
+                    thumbnail = playlist.tracks[0].thumbnail
+                    embed = self.addedPlaylistToQueue(ctx,playlist,query,thumbnail)
+                    await ctx.send(embed=embed)
                     for track in playlist.tracks:
-                        await self.route(ctx,track,player,is_playnow)
+                        partial_track= wavelink.PartialTrack(query=track.title)
+                        await self.route(ctx,partial_track,player,is_playnow)
+
                 else:
                     track = None
                     try:
@@ -401,7 +414,7 @@ class Music(commands.Cog):
     
     @commands.command(
         name="clear",
-        aliases=['cl'],
+        aliases=['c'],
         help=""
     )
     async def clear_command(self, ctx: commands.Context):
@@ -447,29 +460,54 @@ class Music(commands.Cog):
         aliases=['q','dq'],
         help=""
     )
-    async def display_queue_command(self, ctx: commands.Context):
-        player: wavelink.Player = ctx.voice_client
-        if not (await self.validate(ctx,player)):
+    async def display_queue_command(self, ctx: commands.Context,*, page: str=""):
+        try:
+            player: wavelink.Player = ctx.voice_client
+            if not (await self.validate(ctx,player)):
+                return
+            queue = player.queue
+            if queue.is_empty:
+                await ctx.send("The queue is empty")
+                return
+            message=""
+            embed = None
+            try:
+                page_num = int(page)
+            except:
+                page_num = 1
+            if page_num <= 0:
+                page_num = 1
+            start = page_num * 10 - 10
+            pages = math.ceil(queue.count / 10)
+            for num in range(0,10):
+                current_song = start+num
+                try:
+                    track = queue[current_song]
+                except:
+                    break
+                title = track.title
+                message += f"({current_song+1}) {title}\n\n"
+                embed = discord.Embed(
+                    title = f"Music Queue - Page {page_num}/{pages}",
+                    description = message,
+                    colour = self.EMBED_GREEN
+                )
+            try:
+                await ctx.send(embed=embed)
+            except:
+                embed = discord.Embed(title=f"There are only {pages} pages in the queue", color=self.EMBED_RED)
+                await ctx.send(embed=embed)
+        except Exception as e:
+            embed = discord.Embed(title=f"Something went wrong while displaying the queue", color=self.EMBED_RED)
+            await ctx.send(embed=embed)
+            error = traceback.format_exc()
+            print(error)
+            # vars = {
+            #         "error": e,
+            #         "query": query,
+            #     }
+            await self.sendDM("display_queue_command",error)
             return
-        queue = player.queue
-        if queue.is_empty:
-            await ctx.send("The queue is empty")
-            return
-        i = 1
-        message=""
-        for track in queue:
-            title = track.title
-            duration = self.convertDuration(track.duration)
-            link = track.uri
-            message += f"({i}) [{title}]({link}) ({duration})\n"
-            i+=1
-        embed = discord.Embed(
-            title = f"Music Queue",
-            description = message,
-            colour = self.EMBED_GREEN
-        )
-        
-        await ctx.send(embed=embed)
   
     @commands.command(
         name="repeat",
@@ -486,6 +524,24 @@ class Music(commands.Cog):
             await ctx.send(f"Now repeating {player.track.title}")
         else:
             await ctx.send(f"No longer repeating {player.track.title}")
+
+    @commands.command(
+        name="seek",
+        aliases=[],
+        help=""
+    )
+    async def seek_command(self, ctx: commands.Context, to):
+        player: wavelink.Player = ctx.voice_client
+        if not (await self.validate(ctx,player)):
+            return
+        length = player.track.length
+        try:
+            seconds = int(to)
+        except:
+            seconds = 0
+        if (seconds <=0 or seconds >= length):
+            seconds = 0
+        await player.seek(seconds*1000)
         
 
     @commands.command(
