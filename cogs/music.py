@@ -6,6 +6,7 @@ import sys
 import math
 from discord.ui import Select,View
 import validators
+import traceback
 
 class Music(commands.Cog):
     def __init__(self,bot: commands.Bot):
@@ -14,9 +15,6 @@ class Music(commands.Cog):
 
         self.join_context = {}
         self.is_looping = {}
-
-        # self.play_mode = {}
-        # self.VALID_PLAY_MODE = ['youtube','spotify','soundcloud']
 
         self.EMBED_BLUE = 0x2c6dd
         self.EMBED_RED = 0xdf1141
@@ -28,7 +26,6 @@ class Music(commands.Cog):
         #Make each server an id to a dictionary to distinguish them from one another
         for guild in self.bot.guilds:
             id = int(guild.id)
-            # self.play_mode[id] = "youtube"
             self.is_looping[id] = False
         print("Bot Online")
 
@@ -133,10 +130,9 @@ class Music(commands.Cog):
             description = f'{name} ({length})',
             colour = self.EMBED_GREEN
         )
-        if type(playlist) == wavelink.YouTubeTrack:
-            thumbnail = playlist.thumbnail
-            embed.set_thumbnail(url=thumbnail)
-        embed.set_footer(text=f'Song added by {str(author)}',icon_url=avatar)
+        thumbnail = playlist.thumbnail
+        embed.set_thumbnail(url=thumbnail)
+        embed.set_footer(text=f'Playlist added by {str(author)}',icon_url=avatar)
         return embed
 
     def convertDuration(self, duration):
@@ -163,11 +159,13 @@ class Music(commands.Cog):
         return options
 
 
-    async def sendDM(self,func,vars: dict):
+    async def sendDM(self,func, error):
+        #vars:dict for previous iteration
         user = await self.bot.fetch_user(404491098946273280)
         message = f"Error in: {func}"
-        for var in vars:
-            message += f"\n{var}: {vars[var]}"
+        message += error
+        # for var in vars:
+        #     message += f"\n{var}: {vars[var]}"
         await user.send(message)
 
     async def create_nodes(self):
@@ -232,10 +230,7 @@ class Music(commands.Cog):
                 await msg.edit(embed=embed,view=new_view)
                 player: wavelink.Player = ctx.voice_client
                 selection = search_list[song_number-1]
-                if (player.is_playing() or player.is_paused()) and not is_playnow:
-                    await self.addToQueue(ctx,selection,player)
-                else:
-                    await self.playSong(ctx,selection,player)
+                await self.route(ctx,selection,player,is_playnow)
             select.callback = SongChosen
             view = View()
             view.add_item(select)
@@ -254,42 +249,6 @@ class Music(commands.Cog):
                 }
             await self.sendDM("play_command",vars)
             return
-
-    async def search(self,ctx,query,id):
-        try:
-            search = None
-            try:
-                if self.play_mode[id] == "youtube":
-                    search = await wavelink.YouTubeTrack.search(query=query, return_first=True)
-                elif self.play_mode[id] == "soundcloud":
-                    search = await wavelink.SoundCloudTrack.search(query=query, return_first=True)
-            except IndexError:
-                embed = discord.Embed(title=f"No results for search query: {query}\nPlease try a different search query", color=self.EMBED_RED)
-                await ctx.send(embed=embed)
-                return
-            except Exception as e:
-                #Maybe it was a playlist instead?
-                try:
-                    search = await wavelink.YouTubePlaylist.search(query=query)
-                    return search
-                except IndexError:
-                    embed = discord.Embed(title=f"No results for search query: {query}\nPlease try a different search query", color=self.EMBED_RED)
-                    await ctx.send(embed=embed)
-                    return
-                embed = discord.Embed(title=f"Something went wrong while searching for: {query}", color=self.EMBED_RED)
-                await ctx.send(embed=embed)
-                vars = {
-                        "error": e,
-                        "query": query,
-                        "search": search
-                    }
-                await self.sendDM("play_command",vars)
-                return
-            return search
-        except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            print(exc_type, fname, exc_tb.tb_lineno,e)
 
     async def validatePlay(self,ctx):
         if ctx.author.voice:
@@ -328,14 +287,60 @@ class Music(commands.Cog):
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
             print(exc_type, fname, exc_tb.tb_lineno,e)
 
-    async def addToQueue(self,ctx,search,player,is_playlist=False):
-        player.queue.put(search)
+    async def addToQueue(self,ctx,search,player):
+        await player.queue.put_wait(search)
         len = player.queue.count
-        if not is_playlist:
-            embed = self.addedSongToQueue(ctx,search,len)
+        embed = self.addedSongToQueue(ctx,search,len)
+        await ctx.send(embed=embed)
+    
+    async def route(self,ctx,track,player,is_playnow = False):
+        if player.is_playing() or player.is_paused() and not is_playnow:
+            await self.addToQueue(ctx,track,player)
+        else:
+            await self.playSong(ctx,track,player)
+    
+    async def omniPlayer(self,ctx,query,is_playnow = False):
+        try:
+            if len(query) == 0:
+                await ctx.send("Please enter a search term")
+                return
+            if not await self.validatePlay(ctx):
+                return
+            if not validators.url(query):
+                #Play will occur later, this function only creates an embed menu to select the song
+                await self.chooseSong(ctx, query,is_playnow)
+                return
+            else:
+                #When a url is given, play the song immediately
+                player: wavelink.Player = ctx.voice_client
+                if "playlist?" in query:
+                    #PLAYLIST TECH
+                    playlist = await wavelink.YouTubePlaylist.search(query=query)
+                    for track in playlist.tracks:
+                        await self.route(ctx,track,player,is_playnow)
+                else:
+                    track = None
+                    try:
+                        track = await player.YouTubeTrack.search(query=query)
+                    except:
+                        track = await player.node.get_tracks(query=query, cls=wavelink.Track)
+                        track = track[0]
+                    await self.route(ctx,track,player,is_playnow)
+                return
+        except IndexError:
+            await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
+            return
+        except Exception as e:
+            embed = discord.Embed(title=f"Something went wrong while searching for: {query}", color=self.EMBED_RED)
             await ctx.send(embed=embed)
-        # else 
-            
+            error = traceback.format_exc()
+            print(error)
+            # vars = {
+            #         "error": e,
+            #         "query": query,
+            #     }
+            await self.sendDM("play_command",error)
+            return
 
     @commands.command(
         name="join",
@@ -380,39 +385,8 @@ class Music(commands.Cog):
         help=""
     )
     async def play_command(self, ctx: commands.Context, *, query: str=""):
-        try:
-            id = int(ctx.guild.id)
-            if len(query) == 0:
-                await ctx.send("Please enter a search term")
-                return
-            if not await self.validatePlay(ctx):
-                return
-            if not validators.url(query):
-                #Play will occur later, this function only creates an embed menu to select the song
-                await self.chooseSong(ctx, query,id)
-                return
-            else:
-                #When a url is given, play the song immediately
-                player: wavelink.Player = ctx.voice_client
-                track = await player.node.get_tracks(query=query, cls=wavelink.Track)
-                track = track[0]
-                #PLAYLIST TECH
-                # if type(track) == wavelink.tracks.YouTubePlaylist:
-                #     playlist = track
-                #     for track in playlist.tracks:
-                #             await self.addToQueue(ctx,playlist,player,True)
-                #     if not player.is_playing() or player.is_paused():
-                #         track = await player.queue.get_wait()
-                #         await player.playSong(track)
-                #     return
-                if player.is_playing() or player.is_paused():
-                    await self.addToQueue(ctx,track,player)
-                else:
-                    await self.playSong(ctx,track,player)
-        except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            print(exc_type, fname, exc_tb.tb_lineno,e)
+        is_nowplaying = False
+        await self.omniPlayer(ctx,query,is_nowplaying)
 
 
     @commands.command(
@@ -421,19 +395,8 @@ class Music(commands.Cog):
         help=""
     )
     async def play_now_command(self, ctx: commands.Context, *, query: str=""):
-        id = int(ctx.guild.id)
-        if len(query) == 0:
-            await ctx.send("Please enter a search term")
-            return
-        if not await self.validatePlay(ctx):
-            return
-        
-        if not validators.url(query):
-            await self.chooseSong(ctx, query,id,True)
-            return
-        search = await self.search(ctx,query,id)
-        player: wavelink.Player = ctx.voice_client
-        await self.playSong(ctx,search,player)
+        is_nowplaying = True
+        await self.omniPlayer(ctx,query,is_nowplaying)
 
     
     @commands.command(
@@ -552,52 +515,6 @@ class Music(commands.Cog):
         await player.set_volume(to)
         await ctx.send(f"Set volume to {to}%")
     
-    # @commands.command(
-    #     name="set_play_config",
-    #     aliases=['spc'],
-    #     help=""
-    # )
-    # async def set_play_config_command(self, ctx: commands.Context, play_mode:str,search_mode:str):
-    #     id = int(ctx.guild.id)
-    #     if play_mode.lower() in self.VALID_PLAY_MODE and search_mode.lower() in self.VALID_SEARCH_MODE:
-    #         self.play_mode[id] = play_mode.lower()
-    #         self.search_mode[id] = search_mode.lower()
-    #         if search_mode.lower() == "list":
-    #             search_mode = "list of songs"
-    #         else:
-    #             search_mode = "single song"
-    #         author = ctx.author
-    #         avatar = author.avatar.url
-    #         embed = discord.Embed(
-    #         title = "Successfully configured",
-    #         description = f'Search songs from {play_mode.lower()}\nSearch for a {search_mode}',
-    #         colour = self.EMBED_GREEN
-    #     )
-    #         embed.set_footer(text=f'Play command configured by {str(author)}',icon_url=avatar)
-    #         await ctx.send(embed=embed)
-    #     else:
-    #         await ctx.send("Please enter a valid configuration for play_mode ['youtube','spotify','soundcloud'], and search_mode ['single','list']")
-
-    # @commands.command(
-    #     name="get_play_config",
-    #     aliases=['gpc'],
-    #     help=""
-    # )
-    # async def get_play_config_command(self, ctx: commands.Context):
-    #     id = int(ctx.guild.id)
-    #     search_mode = self.search_mode[id]
-    #     play_mode = self.play_mode[id]
-    #     if search_mode.lower() == "list":
-    #         search_mode = "list of songs"
-    #     else:
-    #         search_mode = "single song"
-    #     embed = discord.Embed(
-    #     title = "Current Configuration",
-    #     description = f'Search songs from {play_mode.lower()}\nSearch for a {search_mode}',
-    #     colour = self.EMBED_GREEN
-    #     )
-    #     await ctx.send(embed=embed)
-
     @commands.command(
         name="currently_playing",
         aliases=['cu','current','cp'],
