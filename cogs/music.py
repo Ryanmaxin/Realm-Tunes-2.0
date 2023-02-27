@@ -15,10 +15,8 @@ class Music(commands.Cog):
         self.join_context = {}
         self.is_looping = {}
 
-        self.play_mode = {}
-        self.search_mode = {}
-        self.VALID_PLAY_MODE = ['youtube','spotify','soundcloud']
-        self.VALID_SEARCH_MODE = ['single','list']
+        # self.play_mode = {}
+        # self.VALID_PLAY_MODE = ['youtube','spotify','soundcloud']
 
         self.EMBED_BLUE = 0x2c6dd
         self.EMBED_RED = 0xdf1141
@@ -30,8 +28,7 @@ class Music(commands.Cog):
         #Make each server an id to a dictionary to distinguish them from one another
         for guild in self.bot.guilds:
             id = int(guild.id)
-            self.play_mode[id] = "youtube"
-            self.search_mode[id] = "single"
+            # self.play_mode[id] = "youtube"
             self.is_looping[id] = False
         print("Bot Online")
 
@@ -146,11 +143,25 @@ class Music(commands.Cog):
         minutes = str(math.floor(duration/60))
         seconds = str(int(duration%60))
         if len(seconds) == 1:
-            if minutes == "0":
-                seconds = "0" + seconds
-            else:
-                seconds = seconds + "0"
+            seconds = "0" + seconds
         return f"{minutes}:{seconds}"
+
+    def buildResponse(self,length):
+        options=[
+            discord.SelectOption(value="1",label="One",emoji="1️⃣"),
+            discord.SelectOption(value="2", label="Two",emoji="2️⃣"),
+            discord.SelectOption(value="3", label="Three",emoji="3️⃣"),
+            discord.SelectOption(value="4", label="Four",emoji="4️⃣"),
+            discord.SelectOption(value="5", label="Five",emoji="5️⃣"),
+            discord.SelectOption(value="6", label="Six",emoji="6️⃣"),
+            discord.SelectOption(value="7", label="Seven",emoji="7️⃣"),
+            discord.SelectOption(value="8", label="Eight",emoji="8️⃣"),
+            discord.SelectOption(value="9", label="Nine",emoji="9️⃣"),
+            discord.SelectOption(value="10", label="Ten",emoji="🔟")
+            ]
+        options = options[:length]
+        return options
+
 
     async def sendDM(self,func,vars: dict):
         user = await self.bot.fetch_user(404491098946273280)
@@ -182,31 +193,25 @@ class Music(commands.Cog):
         self.join_context[id] = ctx
         result = True
         return result
-
-    async def chooseSong(self,ctx,query,id,is_playnow=False):
-        type = 'YouTube'
+    async def chooseSong(self,ctx,query,is_playnow=False):
         try:
             search_list = None
-            if self.play_mode[id] == "youtube":
-                search_list = await wavelink.YouTubeTrack.search(query=query)
-            elif self.play_mode[id] == "soundcloud":
-                search_list = await wavelink.SoundCloudTrack.search(query=query)
-                type = 'SoundCloud'
-            message=""
+            search_list = await wavelink.YouTubeTrack.search(query=query)
+            #Soundcloud Disabled until I can find a fix for the 30 second cutoff
             i=0
+            length = 10
+            if len(search_list) < 10:
+                length = len(search_list)
+            message=""
             emoji_list = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"]
-            if not search_list:
-                embed = discord.Embed(title=f"No results for search query: {query}\nPlease try a different search query", color=self.EMBED_RED)
-                await ctx.send(embed=embed)
-                return
-            for track in search_list[:10]:
+            for track in search_list[:length]:
                 title = track.title
                 duration = self.convertDuration(track.duration)
                 link = track.uri
-                message += f"{emoji_list[i]} [{title}]({link}) ({duration})\n"
+                message += f"{emoji_list[i]} [{title}]({link}) ({duration})\n\n"
                 i+=1
             embed = discord.Embed(
-                title = f"{type} Search Results For: {query}",
+                title = f"Youtube Search Results For: {query}",
                 description = message,
                 colour = self.EMBED_GREEN
             )
@@ -214,18 +219,8 @@ class Music(commands.Cog):
                 placeholder="Choose a song",
                 min_values="1",
                 max_values="1",
-                options=[
-                    discord.SelectOption(value="1",label="One",emoji="1️⃣"),
-                    discord.SelectOption(value="2", label="Two",emoji="2️⃣"),
-                    discord.SelectOption(value="3", label="Three",emoji="3️⃣"),
-                    discord.SelectOption(value="4", label="Four",emoji="4️⃣"),
-                    discord.SelectOption(value="5", label="Five",emoji="5️⃣"),
-                    discord.SelectOption(value="6", label="Six",emoji="6️⃣"),
-                    discord.SelectOption(value="7", label="Seven",emoji="7️⃣"),
-                    discord.SelectOption(value="8", label="Eight",emoji="8️⃣"),
-                    discord.SelectOption(value="9", label="Nine",emoji="9️⃣"),
-                    discord.SelectOption(value="10", label="Ten",emoji="🔟")
-                    ])
+                options=self.buildResponse(length)
+            )
             
             async def SongChosen(interaction):
                 await interaction.response.defer()
@@ -324,9 +319,14 @@ class Music(commands.Cog):
         return True
     
     async def playSong(self,ctx,search,player):
-        await player.play(search)
-        embed = self.nowPlaying(ctx,search)
-        await ctx.send(embed=embed)
+        try:
+            await player.play(search)
+            embed = self.nowPlaying(ctx,search)
+            await ctx.send(embed=embed)
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, fname, exc_tb.tb_lineno,e)
 
     async def addToQueue(self,ctx,search,player,is_playlist=False):
         player.queue.put(search)
@@ -334,7 +334,7 @@ class Music(commands.Cog):
         if not is_playlist:
             embed = self.addedSongToQueue(ctx,search,len)
             await ctx.send(embed=embed)
-        else 
+        # else 
             
 
     @commands.command(
@@ -380,34 +380,40 @@ class Music(commands.Cog):
         help=""
     )
     async def play_command(self, ctx: commands.Context, *, query: str=""):
-        id = int(ctx.guild.id)
-        if len(query) == 0:
-            await ctx.send("Please enter a search term")
-            return
-        if not await self.validatePlay(ctx):
-            return
-        # URL_REGEX.match() checks for a match only at the beginning of the string
-        # URL_REGEX.search() checks for a match anywhere in the string
-        # URL_REGEX.fullmatch() checks for entire string to be a match
-        if self.search_mode[id] == 'list' and not validators.url(query):
-            await self.chooseSong(ctx, query,id)
-            #Play will occur later, this function only creates an embed menu to select the song
-            return
-        track = await self.search(ctx,query,id)
-        player: wavelink.Player = ctx.voice_client
-        if type(track) == wavelink.tracks.YouTubePlaylist:
-            playlist = track
-            for track in playlist.tracks:
-                    await self.addToQueue(ctx,playlist,player,True)
-            if not player.is_playing() or player.is_paused():
-                track = await player.queue.get_wait()
-                await player.playSong(track)
-            return
-        player: wavelink.Player = ctx.voice_client
-        if player.is_playing() or player.is_paused():
-            await self.addToQueue(ctx,track,player)
-        else:
-            await self.playSong(ctx,track,player)
+        try:
+            id = int(ctx.guild.id)
+            if len(query) == 0:
+                await ctx.send("Please enter a search term")
+                return
+            if not await self.validatePlay(ctx):
+                return
+            if not validators.url(query):
+                #Play will occur later, this function only creates an embed menu to select the song
+                await self.chooseSong(ctx, query,id)
+                return
+            else:
+                #When a url is given, play the song immediately
+                player: wavelink.Player = ctx.voice_client
+                track = await player.node.get_tracks(query=query, cls=wavelink.Track)
+                track = track[0]
+                #PLAYLIST TECH
+                # if type(track) == wavelink.tracks.YouTubePlaylist:
+                #     playlist = track
+                #     for track in playlist.tracks:
+                #             await self.addToQueue(ctx,playlist,player,True)
+                #     if not player.is_playing() or player.is_paused():
+                #         track = await player.queue.get_wait()
+                #         await player.playSong(track)
+                #     return
+                if player.is_playing() or player.is_paused():
+                    await self.addToQueue(ctx,track,player)
+                else:
+                    await self.playSong(ctx,track,player)
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, fname, exc_tb.tb_lineno,e)
+
 
     @commands.command(
         name="play_now",
@@ -422,7 +428,7 @@ class Music(commands.Cog):
         if not await self.validatePlay(ctx):
             return
         
-        if self.search_mode[id] == 'list':
+        if not validators.url(query):
             await self.chooseSong(ctx, query,id,True)
             return
         search = await self.search(ctx,query,id)
@@ -546,51 +552,51 @@ class Music(commands.Cog):
         await player.set_volume(to)
         await ctx.send(f"Set volume to {to}%")
     
-    @commands.command(
-        name="set_play_config",
-        aliases=['spc'],
-        help=""
-    )
-    async def set_play_config_command(self, ctx: commands.Context, play_mode:str,search_mode:str):
-        id = int(ctx.guild.id)
-        if play_mode.lower() in self.VALID_PLAY_MODE and search_mode.lower() in self.VALID_SEARCH_MODE:
-            self.play_mode[id] = play_mode.lower()
-            self.search_mode[id] = search_mode.lower()
-            if search_mode.lower() == "list":
-                search_mode = "list of songs"
-            else:
-                search_mode = "single song"
-            author = ctx.author
-            avatar = author.avatar.url
-            embed = discord.Embed(
-            title = "Successfully configured",
-            description = f'Search songs from {play_mode.lower()}\nSearch for a {search_mode}',
-            colour = self.EMBED_GREEN
-        )
-            embed.set_footer(text=f'Play command configured by {str(author)}',icon_url=avatar)
-            await ctx.send(embed=embed)
-        else:
-            await ctx.send("Please enter a valid configuration for play_mode ['youtube','spotify','soundcloud'], and search_mode ['single','list']")
+    # @commands.command(
+    #     name="set_play_config",
+    #     aliases=['spc'],
+    #     help=""
+    # )
+    # async def set_play_config_command(self, ctx: commands.Context, play_mode:str,search_mode:str):
+    #     id = int(ctx.guild.id)
+    #     if play_mode.lower() in self.VALID_PLAY_MODE and search_mode.lower() in self.VALID_SEARCH_MODE:
+    #         self.play_mode[id] = play_mode.lower()
+    #         self.search_mode[id] = search_mode.lower()
+    #         if search_mode.lower() == "list":
+    #             search_mode = "list of songs"
+    #         else:
+    #             search_mode = "single song"
+    #         author = ctx.author
+    #         avatar = author.avatar.url
+    #         embed = discord.Embed(
+    #         title = "Successfully configured",
+    #         description = f'Search songs from {play_mode.lower()}\nSearch for a {search_mode}',
+    #         colour = self.EMBED_GREEN
+    #     )
+    #         embed.set_footer(text=f'Play command configured by {str(author)}',icon_url=avatar)
+    #         await ctx.send(embed=embed)
+    #     else:
+    #         await ctx.send("Please enter a valid configuration for play_mode ['youtube','spotify','soundcloud'], and search_mode ['single','list']")
 
-    @commands.command(
-        name="get_play_config",
-        aliases=['gpc'],
-        help=""
-    )
-    async def get_play_config_command(self, ctx: commands.Context):
-        id = int(ctx.guild.id)
-        search_mode = self.search_mode[id]
-        play_mode = self.play_mode[id]
-        if search_mode.lower() == "list":
-            search_mode = "list of songs"
-        else:
-            search_mode = "single song"
-        embed = discord.Embed(
-        title = "Current Configuration",
-        description = f'Search songs from {play_mode.lower()}\nSearch for a {search_mode}',
-        colour = self.EMBED_GREEN
-        )
-        await ctx.send(embed=embed)
+    # @commands.command(
+    #     name="get_play_config",
+    #     aliases=['gpc'],
+    #     help=""
+    # )
+    # async def get_play_config_command(self, ctx: commands.Context):
+    #     id = int(ctx.guild.id)
+    #     search_mode = self.search_mode[id]
+    #     play_mode = self.play_mode[id]
+    #     if search_mode.lower() == "list":
+    #         search_mode = "list of songs"
+    #     else:
+    #         search_mode = "single song"
+    #     embed = discord.Embed(
+    #     title = "Current Configuration",
+    #     description = f'Search songs from {play_mode.lower()}\nSearch for a {search_mode}',
+    #     colour = self.EMBED_GREEN
+    #     )
+    #     await ctx.send(embed=embed)
 
     @commands.command(
         name="currently_playing",
@@ -616,24 +622,24 @@ class Music(commands.Cog):
         await player.seek(0)
         await ctx.send("Starting the song from the beginning")
 
-    @commands.command(
-        name="speed",
-        aliases=['f'],
-        help=""
-    )
-    async def timescale_command(self, ctx: commands.Context):
-        try:
-            player: wavelink.Player = ctx.voice_client
-            if not (await self.validate(ctx,player)):
-                return
-            # filter = wavelink.Filter(wavelink.k)
-            await player.set_filter(wavelink.Filter(rotation=wavelink.Rotation(speed = 1.2)))
+    # @commands.command(
+    #     name="speed",
+    #     aliases=['f'],
+    #     help=""
+    # )
+    # async def timescale_command(self, ctx: commands.Context):
+    #     try:
+    #         player: wavelink.Player = ctx.voice_client
+    #         if not (await self.validate(ctx,player)):
+    #             return
+    #         # filter = wavelink.Filter(wavelink.k)
+    #         await player.set_filter(wavelink.Filter(rotation=wavelink.Rotation(speed = 1.2)))
 
-            await ctx.send("SET FILTER")
-        except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            print(exc_type, fname, exc_tb.tb_lineno,e)
+    #         await ctx.send("SET FILTER")
+    #     except Exception as e:
+    #         exc_type, exc_obj, exc_tb = sys.exc_info()
+    #         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    #         print(exc_type, fname, exc_tb.tb_lineno,e)
         
 async def setup(bot):
     await bot.add_cog(Music(bot))
