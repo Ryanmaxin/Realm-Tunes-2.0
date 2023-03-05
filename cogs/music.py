@@ -7,6 +7,7 @@ import math
 from discord.ui import Select,View
 import validators
 import traceback
+import random
 
 class Music(commands.Cog):
     def __init__(self,bot: commands.Bot):
@@ -16,6 +17,7 @@ class Music(commands.Cog):
         self.join_context = {}
         self.is_looping = {}
         self.is_repeating_playlist = {}
+        self.previous_song = {}
 
         self.EMBED_BLUE = 0x2c6dd
         self.EMBED_RED = 0xdf1141
@@ -29,6 +31,7 @@ class Music(commands.Cog):
             id = int(guild.id)
             self.is_looping[id] = False
             self.is_repeating_playlist[id] = False
+            self.previous_song[id] = None
         print("Bot Online")
 
     @commands.Cog.listener()
@@ -42,6 +45,7 @@ class Music(commands.Cog):
                 join_context = self.join_context[id]
                 self.is_looping[id] = False
                 self.is_repeating_playlist[id] = False
+                self.previous_song[id] = None
                 await join_context.channel.send(f"Realm Tunes left because there were no members remaining in ``{before.channel}``")
 
 
@@ -54,6 +58,7 @@ class Music(commands.Cog):
     async def on_wavelink_track_end(self, player: wavelink.Player, track, reason):
         id = int(player.guild.id)
         ctx = self.join_context[id]
+        self.previous_song[id] = track
         if str(reason) == "REPLACED":
             return
         if not str(reason) == "FINISHED" and not str(reason) == "STOPPED":
@@ -66,15 +71,16 @@ class Music(commands.Cog):
                 }
             await self.sendDM("on_wavelink_track_end(unexpected reason)",vars)
             return
+        
         if self.is_looping[id]:
             await self.playSong(ctx,track,player)
             await player.seek(0)
-            return
-        if not player.queue.is_empty:
+        elif not player.queue.is_empty:
             if self.is_repeating_playlist[id]:
                 await player.queue.put_wait(track)
             new = await player.queue.get_wait()
             await self.playSong(ctx,new,player)
+            await player.seek(0)
         else:
             await player.stop()
 
@@ -128,7 +134,6 @@ class Music(commands.Cog):
         try:
             title = playlist.name
             length = len(playlist.tracks)
-            link = url
             author = ctx.author
             avatar = author.avatar.url
             embed = discord.Embed(
@@ -290,10 +295,6 @@ class Music(commands.Cog):
     
     async def playSong(self,ctx,search,player):
         try:
-            #Inefficent, but it allows the queue to record history for the first song
-            if not (player.is_playing() or player.is_paused()):
-                await player.queue.put_wait(search)
-                await player.queue.get_wait()
             track = await player.play(search)
             embed = self.nowPlaying(ctx,track)
             await ctx.send(embed=embed)
@@ -305,7 +306,9 @@ class Music(commands.Cog):
     async def addToQueue(self,ctx,search,player):
         await player.queue.put_wait(search)
         len = player.queue.count
-        if type(search) != wavelink.tracks.PartialTrack:
+        if type(search) == wavelink.tracks.PartialTrack:
+            pass
+        elif type(search) != wavelink.tracks.PartialTrack:
             embed = self.addedSongToQueue(ctx,search,len)
             await ctx.send(embed=embed)
 
@@ -331,6 +334,8 @@ class Music(commands.Cog):
                 #When a url is given, play the song immediately
                 player: wavelink.Player = ctx.voice_client
                 if "playlist?" in query:
+                    if is_playnow:
+                        is_playnow = False
                     #PLAYLIST TECH
                     playlist = await wavelink.YouTubePlaylist.search(query=query)
                     thumbnail = playlist.tracks[0].thumbnail
@@ -400,6 +405,7 @@ class Music(commands.Cog):
         await player.disconnect()
         self.is_looping[id] = False
         self.is_repeating_playlist[id] = False
+        self.previous_song[id] = None
         await ctx.send("Realm Tunes left the chat")
     
     @commands.command(
@@ -520,20 +526,20 @@ class Music(commands.Cog):
             return
   
     @commands.command(
-        name="repeat",
-        aliases=['r'],
+        name="loop",
+        aliases=[],
         help=""
     )
-    async def repeat_command(self, ctx: commands.Context, to=None):
+    async def loop_command(self, ctx: commands.Context, to=None):
         player: wavelink.Player = ctx.voice_client
         if not (await self.validate(ctx,player)):
             return
         id = int(ctx.guild.id)
         self.is_looping[id] = not self.is_looping[id]
         if self.is_looping[id]:
-            await ctx.send(f"Now repeating {player.track.title}")
+            await ctx.send(f"Now looping {player.track.title}")
         else:
-            await ctx.send(f"No longer repeating {player.track.title}")
+            await ctx.send(f"No longer looping {player.track.title}")
 
     @commands.command(
         name="seek",
@@ -559,22 +565,23 @@ class Music(commands.Cog):
         help=""
     )
     async def previous_command(self, ctx: commands.Context, now=""):
+        id = int(ctx.guild.id)
         try:
             player: wavelink.Player = ctx.voice_client
             if not (await self.validatePlay(ctx)):
                 return
-            try:
-                previous = player.queue.history[0]
-
+            previous = self.previous_song[id]
+            if previous == None:
+                await ctx.send(f"No previous song found")
+                return
+            else:
                 is_playingnow = False
                 if now == "now":
                     is_playingnow = True
                 await self.route(ctx,previous,player,is_playingnow)
-            except:
-                await ctx.send(f"No previous song found")
             
         except Exception as e:
-            embed = discord.Embed(title=f"Something went wrong while displaying the queue", color=self.EMBED_RED)
+            embed = discord.Embed(title=f"Something went wrong while playing the previous song the queue", color=self.EMBED_RED)
             await ctx.send(embed=embed)
             error = traceback.format_exc()
             print(error)
@@ -582,36 +589,37 @@ class Music(commands.Cog):
             #         "error": e,
             #         "query": query,
             #     }
-            await self.sendDM("display_queue_command",error)
+            await self.sendDM("previous_command",error)
             return
         
 
     @commands.command(
-        name="loop",
-        aliases=[],
+        name="repeat",
+        aliases=['r','re'],
         help=""
     )
-    async def loop_command(self, ctx: commands.Context):
+    async def repeat_command(self, ctx: commands.Context):
         player: wavelink.Player = ctx.voice_client
         if not (await self.validate(ctx,player)):
             return
         id = int(ctx.guild.id)
         self.is_repeating_playlist[id] = not self.is_repeating_playlist[id]
         if self.is_repeating_playlist[id]:
-            await ctx.send(f"Now looping the queue")
+            await ctx.send(f"Now repeating the queue")
         else:
-            await ctx.send(f"No longer looping the queue")
+            await ctx.send(f"No longer repeating the queue")
 
     @commands.command(
         name="shuffle",
         aliases=["shuf","sh"],
         help=""
     )
-    async def shuffle_command(self, ctx: commands.Context, to):
+    async def shuffle_command(self, ctx: commands.Context):
         player: wavelink.Player = ctx.voice_client
         if not (await self.validate(ctx,player)):
             return
-        pass
+        random.shuffle(player.queue._queue)
+        await ctx.send(f"Shuffled the queue")
         
 
     @commands.command(
