@@ -11,6 +11,7 @@ load_dotenv()
 password = str(os.getenv("bot_key"))
 
 bot = commands.Bot(command_prefix = '-', intents = discord.Intents.all(), case_insensitive = True)
+bot.remove_command('help')
 
 async def load_extensions():
     for filename in os.listdir("./cogs"):

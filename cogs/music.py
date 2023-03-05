@@ -5,6 +5,7 @@ import os
 import sys
 import math
 from discord.ui import Select,View
+from discord import Color
 import validators
 import traceback
 import random
@@ -18,10 +19,6 @@ class Music(commands.Cog):
         self.is_looping = {}
         self.is_repeating_playlist = {}
         self.previous_song = {}
-
-        self.EMBED_BLUE = 0x2c6dd
-        self.EMBED_RED = 0xdf1141
-        self.EMBED_GREEN = 0x0eaa51
 
 
     @commands.Cog.listener()
@@ -62,7 +59,7 @@ class Music(commands.Cog):
         if str(reason) == "REPLACED":
             return
         if not str(reason) == "FINISHED" and not str(reason) == "STOPPED":
-            embed = discord.Embed(title=f"Something went wrong while playing: {track.title}", color=self.EMBED_RED)
+            embed = discord.Embed(title=f"Something went wrong while playing: {track.title}", color=Color.red())
             await ctx.send(embed=embed)
             vars = {
                     "player": player,
@@ -104,7 +101,7 @@ class Music(commands.Cog):
         embed = discord.Embed(
             title = "Now Playing",
             description = f'[{title}]({link}) ({duration})',
-            colour = self.EMBED_GREEN
+            colour = Color.green()
         )
         if type(track) == wavelink.YouTubeTrack:
             thumbnail = track.thumbnail
@@ -122,7 +119,7 @@ class Music(commands.Cog):
         embed = discord.Embed(
             title = f"Added to Queue ({qlen})",
             description = f'[{title}]({link}) ({duration})',
-            colour = self.EMBED_GREEN
+            colour = Color.green()
         )
         if type(track) == wavelink.YouTubeTrack:
             thumbnail = track.thumbnail
@@ -139,7 +136,7 @@ class Music(commands.Cog):
             embed = discord.Embed(
                 title = f"Playlist Added to Queue",
                 description = f'[{title}]({url}) ({length} songs)',
-                colour = self.EMBED_GREEN
+                colour = Color.green()
             )
             thumbnail = img
             embed.set_thumbnail(url=thumbnail)
@@ -227,7 +224,7 @@ class Music(commands.Cog):
             embed = discord.Embed(
                 title = f"Youtube Search Results For: {query}",
                 description = message,
-                colour = self.EMBED_GREEN
+                colour = Color.green()
             )
             select = Select(
                 placeholder="Choose a song",
@@ -256,7 +253,7 @@ class Music(commands.Cog):
             await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
             return
         except Exception as e:
-            embed = discord.Embed(title=f"Something went wrong while searching for: {query}", color=self.EMBED_RED)
+            embed = discord.Embed(title=f"Something went wrong while searching for: {query}", color=Color.red())
             await ctx.send(embed=embed)
             vars = {
                     "error": e,
@@ -271,7 +268,7 @@ class Music(commands.Cog):
             user_channel = ctx.author.voice.channel
             result = await self.joinVC(ctx,user_channel)
             if result == None:
-                embed = discord.Embed(title=f"Something went wrong while connecting to the voice channel!", color=self.EMBED_RED)
+                embed = discord.Embed(title=f"Something went wrong while connecting to the voice channel!", color=Color.red())
                 await ctx.send(embed=embed)
                 vars = {
                     "user_channel": user_channel,
@@ -358,7 +355,7 @@ class Music(commands.Cog):
             await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
             return
         except Exception as e:
-            embed = discord.Embed(title=f"Something went wrong while searching for: {query}", color=self.EMBED_RED)
+            embed = discord.Embed(title=f"Something went wrong while searching for: {query}", color=Color.red())
             await ctx.send(embed=embed)
             error = traceback.format_exc()
             print(error)
@@ -379,7 +376,7 @@ class Music(commands.Cog):
             user_channel = ctx.author.voice.channel
             result = await self.joinVC(ctx,user_channel)
             if result == None:
-                embed = discord.Embed(title=f"Something went wrong while connecting to the voice channel!", color=self.EMBED_RED)
+                embed = discord.Embed(title=f"Something went wrong while connecting to the voice channel!", color=Color.red())
                 await ctx.send(embed=embed)
                 vars = {
                     "user_channel": user_channel,
@@ -447,7 +444,7 @@ class Music(commands.Cog):
         aliases=['t'],
         help=""
     )
-    async def pause_command(self, ctx: commands.Context):
+    async def toggle_command(self, ctx: commands.Context):
         player: wavelink.Player = ctx.voice_client
 
         if not (await self.validate(ctx,player)):
@@ -473,7 +470,7 @@ class Music(commands.Cog):
 
     @commands.command(
         name="display_queue",
-        aliases=['q','dq'],
+        aliases=['queue,''q','dq'],
         help=""
     )
     async def display_queue_command(self, ctx: commands.Context,*, page: str=""):
@@ -506,15 +503,15 @@ class Music(commands.Cog):
                 embed = discord.Embed(
                     title = f"Music Queue - Page {page_num}/{pages}",
                     description = message,
-                    colour = self.EMBED_GREEN
+                    colour = Color.green()
                 )
             try:
                 await ctx.send(embed=embed)
             except:
-                embed = discord.Embed(title=f"There are only {pages} page(s) in the queue", color=self.EMBED_RED)
+                embed = discord.Embed(title=f"There are only {pages} page(s) in the queue", color=Color.red())
                 await ctx.send(embed=embed)
         except Exception as e:
-            embed = discord.Embed(title=f"Something went wrong while displaying the queue", color=self.EMBED_RED)
+            embed = discord.Embed(title=f"Something went wrong while displaying the queue", color=Color.red())
             await ctx.send(embed=embed)
             error = traceback.format_exc()
             print(error)
@@ -581,7 +578,7 @@ class Music(commands.Cog):
                 await self.route(ctx,previous,player,is_playingnow)
             
         except Exception as e:
-            embed = discord.Embed(title=f"Something went wrong while playing the previous song the queue", color=self.EMBED_RED)
+            embed = discord.Embed(title=f"Something went wrong while playing the previous song the queue", color=Color.red())
             await ctx.send(embed=embed)
             error = traceback.format_exc()
             print(error)
@@ -628,6 +625,9 @@ class Music(commands.Cog):
         help=""
     )
     async def volume_command(self, ctx: commands.Context, to=None):
+        player: wavelink.Player = ctx.voice_client
+        if not (await self.validate(ctx,player)):
+            return
         try:
             to = int(to)
         except:
@@ -640,12 +640,8 @@ class Music(commands.Cog):
             await ctx.send("Volume must be between 0 and 1000")
             return
         elif to > 100:
-            embed = discord.Embed(title=f"Warning: setting volume over 100% is not recommended. Please be careful!", color=self.EMBED_RED)
+            embed = discord.Embed(title=f"Warning: setting volume over 100% is not recommended. Please be careful!", color=Color.red())
             await ctx.send(embed=embed)
-
-        player: wavelink.Player = ctx.voice_client
-        if not (await self.validate(ctx,player)):
-            return
         await player.set_volume(to)
         await ctx.send(f"Set volume to {to}%")
     
