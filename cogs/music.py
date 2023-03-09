@@ -188,8 +188,7 @@ class Music(commands.Cog):
         await wavelink.NodePool.create_node(bot=self.bot,
                                             host='127.0.0.1',
                                             port=2333,
-                                            password='youshallnotpass',
-                                            region='US CENTRAL')
+                                            password='Raleigh')
     
     async def joinVC(self,ctx, channel):
         id = int(ctx.guild.id)
@@ -470,7 +469,7 @@ class Music(commands.Cog):
 
     @commands.command(
         name="display_queue",
-        aliases=['queue,''q','dq'],
+        aliases=['queue','q','dq'],
         help=""
     )
     async def display_queue_command(self, ctx: commands.Context,*, page: str=""):
