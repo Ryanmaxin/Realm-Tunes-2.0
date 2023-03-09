@@ -31,7 +31,7 @@ class Help(commands.Cog):
             embed.add_field(name='Repeat', value= 'Toggles on or off repeating the current queue\n\nUsage: {-repeat/-r/-re}', inline=False)
             embed.add_field(name='Volume', value= 'Sets the volume of Realm Tunes to the specified amount\n\nUsage: {-volume/-v} {volume}', inline=False)
             embed.add_field(name='Currently Playing', value= 'Shows the song that is currently playing\n\nUsage: {-currently_playing/-cu/-current/-cp}', inline=False)
-            embed.add_field(name='Restart', value= 'Shows the song that is currently playing\n\nUsage: {-restart/-res}', inline=False)
+            embed.add_field(name='Restart', value= 'Begins playing the current song from the beginning\n\nUsage: {-restart/-res}', inline=False)
 
             await author.send(embed=embed)
 

@@ -2,4 +2,5 @@
 env
 bot
 __pycache__
-jdk-18.0.2.jdk 
+Lavalink.jar
+application.yml

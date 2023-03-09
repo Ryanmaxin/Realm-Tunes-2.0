@@ -23,6 +23,7 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
+        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="-help"))
         #Make each server an id to a dictionary to distinguish them from one another
         for guild in self.bot.guilds:
             id = int(guild.id)
@@ -96,7 +97,7 @@ class Music(commands.Cog):
         duration = self.convertDuration(track.duration)
         link = track.uri
         author = ctx.author
-        avatar = author.avatar.url
+        avatar = author.display_avatar.url
 
         embed = discord.Embed(
             title = "Now Playing",
@@ -114,7 +115,7 @@ class Music(commands.Cog):
         duration = self.convertDuration(track.duration)
         link = track.uri
         author = ctx.author
-        avatar = author.avatar.url
+        avatar = author.display_avatar.url
 
         embed = discord.Embed(
             title = f"Added to Queue ({qlen})",
@@ -132,7 +133,7 @@ class Music(commands.Cog):
             title = playlist.name
             length = len(playlist.tracks)
             author = ctx.author
-            avatar = author.avatar.url
+            avatar = author.display_avatar.url
             embed = discord.Embed(
                 title = f"Playlist Added to Queue",
                 description = f'[{title}]({url}) ({length} songs)',
