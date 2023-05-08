@@ -1,8 +1,22 @@
 # Realm-Tunes-2.0
 
-A Discord music bot built with the Discord.py API, providing 24/7 music for over 250 users across 6 servers.
+**A Discord music bot built with the Discord.py API, providing 24/7 music for over 250 users across 6 servers.**
 
 <img width="745" alt="image" src="https://user-images.githubusercontent.com/90675771/236710016-529802d2-65b4-42ab-b03a-07a6a2686db1.png">
+
+## Tools Used:
+
+Realm Tunes was created using Python and the Discord.py API. On the backend I used Lavalink to retrieve the audio source (https://github.com/freyacodes/Lavalink), and Wavelink (https://wavelink.readthedocs.io/en/latest/index.html) which provides a Lavalink wrapper for Python.
+
+Realm Tunes is hosted 24/7 on DigitalOcean (https://www.digitalocean.com) for $4/month. Both the Realm Tunes bot as well as the Lavalink server are run continuously with pm2 (https://pm2.keymetrics.io) on a remote Ubuntu server.
+
+## Changes from Realm Tunes 1.0
+
+Realm Tunes 1.0 (https://github.com/Ryanmaxin/Realm-Tunes) was my first attempt to create a music bot. Before I knew about Lavalink, I used tools like YoutubelDL and FFMPEG to retrieve and play audio sources. These tools were not meant to stream music in real-time in the way I was implementing them, and as such, they had severe speed and scaling issues. I knew trying to build further upon these tools would be a mistake and that I needed to find a better way to stream audio, which Lavalink came in handy.
+
+Using Lavalink opened up many additional opportunities for Realm Tunes as well. In addition to seamless streaming, Lavalink has volume and seeking built in, allowing me to use these features that otherwise would have been impossible with FFMPEG.
+
+I also changed my programming philosophy when approaching 2.0. Specifically, I took a much heavier object-orientated approach, whereas in 1.0, I was using functional programming, and I believe this change allowed me to better reason about my bot and will make it easier to add new features in the future.
 
 ## Current Commands:
 
@@ -86,3 +100,11 @@ Shows the song that is currently playing
 Begins playing the current song from the beginning
 
 ![ezgif-1-3b0c13ce69](https://user-images.githubusercontent.com/90675771/236713872-6b9a4ef2-859a-4ca5-9165-4cfdfda27d6d.gif)
+
+## Reflection
+
+I wrote most of the code for Realm Tunes in December 2022 after I had finished my fall coop term and before I got busy with school in my upcoming academic term. I couldn't fully finish here, so I spent much of the Winter reading week, plus occasional weekends here and there, finalizing the bot.
+
+Looking back, I'm glad I spent a lot more time planning out the program's layout as it paid for itself many times over in time saved while debugging or adding new features. 
+
+Realm Tunes 2.0 is my first personal project which I have taken the effort to host on a dedicated platform, and I'm happy to have gotten this experience. 
