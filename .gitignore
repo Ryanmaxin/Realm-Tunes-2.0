@@ -4,3 +4,5 @@ bot
 __pycache__
 Lavalink.jar
 application.yml
+logs
+Lavalink_olc.jar

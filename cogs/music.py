@@ -9,6 +9,7 @@ from discord import Color
 import validators
 import traceback
 import random
+import tracemalloc
 
 class Music(commands.Cog):
     def __init__(self,bot: commands.Bot):
@@ -19,6 +20,7 @@ class Music(commands.Cog):
         self.is_looping = {}
         self.is_repeating_playlist = {}
         self.previous_song = {}
+        tracemalloc.start()
 
 
     @commands.Cog.listener()
@@ -31,6 +33,16 @@ class Music(commands.Cog):
             self.is_repeating_playlist[id] = False
             self.previous_song[id] = None
         print("Bot Online")
+    
+    @commands.Cog.listener()
+    async def on_command_error(self,ctx,error):
+        if isinstance(error, commands.CommandNotFound):
+            await ctx.send("That command does not exist. Use -help for list of all available commands")
+            return
+        else:
+            await self.sendDM("Generic",error)
+            return
+
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -176,7 +188,7 @@ class Music(commands.Cog):
     async def sendDM(self,func, error):
         #vars:dict for previous iteration
         user = await self.bot.fetch_user(404491098946273280)
-        message = f"Error in: {func}"
+        message = f"Error in: {func} \n"
         message += error
         # for var in vars:
         #     message += f"\n{var}: {vars[var]}"
@@ -189,7 +201,7 @@ class Music(commands.Cog):
         await wavelink.NodePool.create_node(bot=self.bot,
                                             host='127.0.0.1',
                                             port=2333,
-                                            password='Raleigh')
+                                            password='youshallnotpass')
     
     async def joinVC(self,ctx, channel):
         id = int(ctx.guild.id)
@@ -266,16 +278,17 @@ class Music(commands.Cog):
     async def validatePlay(self,ctx):
         if ctx.author.voice:
             user_channel = ctx.author.voice.channel
-            result = await self.joinVC(ctx,user_channel)
-            if result == None:
-                embed = discord.Embed(title=f"Something went wrong while connecting to the voice channel!", color=Color.red())
-                await ctx.send(embed=embed)
-                vars = {
-                    "user_channel": user_channel,
-                    "result": result
-                }
-                await self.sendDM("play",vars)
-                return False
+            if not ctx.voice_client:
+                result = await self.joinVC(ctx,user_channel)
+                if result == None:
+                    embed = discord.Embed(title=f"Something went wrong while connecting to the voice channel!", color=Color.red())
+                    await ctx.send(embed=embed)
+                    vars = {
+                        "user_channel": user_channel,
+                        "result": result
+                    }
+                    await self.sendDM("play",vars)
+                    return False
         else:
             await ctx.send("You must be connected to a voice channel to play music")
             return False
@@ -323,11 +336,31 @@ class Music(commands.Cog):
                 return
             if not await self.validatePlay(ctx):
                 return
+            #----DEBUGGING
+            old_stdout = sys.stdout
+
+            log_file = open("logs/message.log","w")
+
+            sys.stdout = log_file
+
+            snapshot = tracemalloc.take_snapshot()
+            top_stats = snapshot.statistics('lineno')
+
+            print("[ Top 10 ]")
+            for stat in top_stats[:10]:
+                print(stat)
+
+            sys.stdout = old_stdout
+
+            log_file.close()
+            
+            #----DEBUGGING
             if not validators.url(query):
                 #Play will occur later, this function only creates an embed menu to select the song
                 await self.chooseSong(ctx, query,is_playnow)
                 return
             else:
+                
                 #When a url is given, play the song immediately
                 player: wavelink.Player = ctx.voice_client
                 if "playlist?" in query:
@@ -345,10 +378,12 @@ class Music(commands.Cog):
                 else:
                     track = None
                     try:
-                        track = await player.YouTubeTrack.search(query=query)
+                        track = await wavelink.YouTubeTrack.search(query=query)
                     except:
-                        track = await player.node.get_tracks(query=query, cls=wavelink.Track)
-                        track = track[0]
+                        track = await wavelink.node.get_tracks(query=query, cls=wavelink.Track)
+                    if not track:
+                        raise IndexError
+                    track = track[0]
                     await self.route(ctx,track,player,is_playnow)
                 return
         except IndexError:
