@@ -19,6 +19,9 @@ class Music(commands.Cog):
         self.is_looping = {}
         self.is_repeating_playlist = {}
         self.previous_song = {}
+        self.server_pass = str(os.getenv("password"))
+        self.server_port = str(os.getenv("port"))
+        self.server_host = str(os.getenv("localhost"))
 
 
     @commands.Cog.listener()
@@ -197,9 +200,9 @@ class Music(commands.Cog):
         
         await self.bot.wait_until_ready()
         await wavelink.NodePool.create_node(bot=self.bot,
-                                            host='127.0.0.1',
-                                            port=2333,
-                                            password='Raleigh')
+                                            host=self.server_host,
+                                            port=self.server_port,
+                                            password=self.server_pass)
     
     async def joinVC(self,ctx, channel):
         id = int(ctx.guild.id)
