@@ -9,7 +9,6 @@ from discord import Color
 import validators
 import traceback
 import random
-import tracemalloc
 
 class Music(commands.Cog):
     def __init__(self,bot: commands.Bot):
@@ -20,7 +19,6 @@ class Music(commands.Cog):
         self.is_looping = {}
         self.is_repeating_playlist = {}
         self.previous_song = {}
-        tracemalloc.start()
 
 
     @commands.Cog.listener()
@@ -201,7 +199,7 @@ class Music(commands.Cog):
         await wavelink.NodePool.create_node(bot=self.bot,
                                             host='127.0.0.1',
                                             port=2333,
-                                            password='youshallnotpass')
+                                            password='Raleigh')
     
     async def joinVC(self,ctx, channel):
         id = int(ctx.guild.id)
@@ -336,25 +334,6 @@ class Music(commands.Cog):
                 return
             if not await self.validatePlay(ctx):
                 return
-            #----DEBUGGING
-            old_stdout = sys.stdout
-
-            log_file = open("logs/message.log","w")
-
-            sys.stdout = log_file
-
-            snapshot = tracemalloc.take_snapshot()
-            top_stats = snapshot.statistics('lineno')
-
-            print("[ Top 10 ]")
-            for stat in top_stats[:10]:
-                print(stat)
-
-            sys.stdout = old_stdout
-
-            log_file.close()
-            
-            #----DEBUGGING
             if not validators.url(query):
                 #Play will occur later, this function only creates an embed menu to select the song
                 await self.chooseSong(ctx, query,is_playnow)

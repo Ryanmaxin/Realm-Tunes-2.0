@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import asyncio
 import logging
 import sys
+import time
 
 from discord.ext import commands
 
@@ -25,4 +26,5 @@ async def main():
         await bot.start(password)
 
 if __name__ == "__main__":
+    time.sleep(20)
     asyncio.run(main())
