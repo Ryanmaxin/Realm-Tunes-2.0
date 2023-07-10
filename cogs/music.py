@@ -69,7 +69,10 @@ class Music(commands.Cog):
                 await join_context.channel.send(f"Realm Tunes left because there were no members remaining in ``{before.channel}``")
 
     @commands.Cog.listener()
-    async def on_wavelink_track_end(self, player: wavelink.Player, track, reason):
+    async def on_wavelink_track_end(self, payload: wavelink.TrackEventPayload):
+        player = payload.player
+        reason = payload.reason
+        track = payload.track
         id = int(player.guild.id)
         ctx = self.join_context[id]
         self.previous_song[id] = track
@@ -80,7 +83,6 @@ class Music(commands.Cog):
             await ctx.send(embed=embed)
             await self.sendDM("on_wavelink_track_end(unexpected reason)")
             return
-        
         if self.is_looping[id]:
             await self.playSong(ctx,track,player)
             await player.seek(0)
@@ -278,19 +280,17 @@ class Music(commands.Cog):
         embed = self.nowPlaying(ctx,track)
         await ctx.send(embed=embed)
 
-    async def addToQueue(self,ctx,search,player):
+    async def addToQueue(self,ctx,search,player,is_playlist=False):
         await player.queue.put_wait(search)
         len = player.queue.count
-        if type(search) == wavelink.tracks.PartialTrack:
-            pass
-        elif type(search) != wavelink.tracks.PartialTrack:
+        if not is_playlist:
             embed = self.addedSongToQueue(ctx,search,len)
             await ctx.send(embed=embed)
 
     
-    async def route(self,ctx,track,player,is_playnow):
+    async def route(self,ctx,track,player,is_playnow,is_playlist = False):
         if (player.is_playing() or player.is_paused()) and not is_playnow:
-            await self.addToQueue(ctx,track,player)
+            await self.addToQueue(ctx,track,player,is_playlist)
         else:
             await self.playSong(ctx,track,player)
     
@@ -316,8 +316,7 @@ class Music(commands.Cog):
                 embed = self.addedPlaylistToQueue(ctx,playlist,query,thumbnail)
                 await ctx.send(embed=embed)
                 for track in playlist.tracks:
-                    partial_track= wavelink.PartialTrack(track.title)
-                    await self.route(ctx,partial_track,player,is_playnow)
+                    await self.route(ctx,track,player,is_playnow,True)
 
             else:
                 track = None
@@ -509,7 +508,7 @@ class Music(commands.Cog):
         if (seconds <=0 or seconds >= length):
             seconds = 0
         await player.seek(seconds*1000)
-        await ctx.send(f"Seeking to ({self.convertDuration(seconds)}) in the song")
+        await ctx.send(f"Seeking to ({self.convertDuration(seconds*1000+1000)}) in the song")
 
     @commands.command(
         name="previous",

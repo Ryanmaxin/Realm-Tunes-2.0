@@ -12,10 +12,10 @@ import wavelink
 from discord.ext import commands
 
 load_dotenv()
-password = str(os.getenv("bot_key"))
+password = str(os.getenv("BOT_KEY"))
 
-server_pass = str(os.getenv("password"))
-server_host = str(os.getenv("localhost"))
+server_pass = str(os.getenv("PASSWORD"))
+server_host = str(os.getenv("HOST"))
 
 
 class Bot(commands.Bot):
@@ -31,7 +31,7 @@ class Bot(commands.Bot):
         print("Realm Tunes Online")
 
     async def setup_hook(self) -> None:
-        node: wavelink.Node = wavelink.Node(uri="http://localhost:2333", password="youshallnotpass")
+        node: wavelink.Node = wavelink.Node(uri=server_host, password=server_pass)
         await wavelink.NodePool.connect(client=self, nodes=[node])
 
     async def on_wavelink_node_ready(self, node: wavelink.Node):
