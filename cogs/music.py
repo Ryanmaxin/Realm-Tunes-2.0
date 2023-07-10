@@ -1,18 +1,18 @@
 import discord
 import wavelink
 from discord.ext import commands
-import os
 import sys
 import math
 from discord.ui import Select,View
 from discord import Color
 import validators
 import random
+import traceback
+import logging
 
 class Music(commands.Cog):
     def __init__(self,bot: commands.Bot):
         self.bot = bot
-
         self.join_context = {}
         self.is_looping = {}
         self.is_repeating_playlist = {}
@@ -20,7 +20,7 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="-help"))
+        # await self.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="-help"))
         #Make each server an id to a dictionary to distinguish them from one another
         for guild in self.bot.guilds:
             id = int(guild.id)
@@ -35,8 +35,21 @@ class Music(commands.Cog):
             return
         else:
             command_name = ctx.invoked_with
+
             embed = discord.Embed(title=f"Something went wrong with {command_name}", color=Color.red())
             await ctx.send(embed=embed)
+
+            error_type = type(error)
+            error_traceback = error.__traceback__
+
+            print(command_name,error)
+            print('Ignoring exception in command {}:'.format(ctx.command), file=sys.stderr)
+            traceback.print_exception(error_type, error, error_traceback, file=sys.stderr)
+
+            exc_info = (error_type, error, error_traceback)
+            logger = logging.getLogger()
+            logger.error('Exception occurred', exc_info=exc_info)
+
             await self.sendDM(command_name,error)
             return
 
@@ -65,12 +78,7 @@ class Music(commands.Cog):
         if not str(reason) == "FINISHED" and not str(reason) == "STOPPED":
             embed = discord.Embed(title=f"Something went wrong while playing: {track.title}", color=Color.red())
             await ctx.send(embed=embed)
-            vars = {
-                    "player": player,
-                    "reason": reason,
-                    "queue": player.queue,
-                }
-            await self.sendDM("on_wavelink_track_end(unexpected reason)",vars)
+            await self.sendDM("on_wavelink_track_end(unexpected reason)")
             return
         
         if self.is_looping[id]:
@@ -128,27 +136,28 @@ class Music(commands.Cog):
         return embed
 
     def addedPlaylistToQueue(self,ctx,playlist,url,img):
-        try:
-            title = playlist.name
-            length = len(playlist.tracks)
-            author = ctx.author
-            avatar = author.display_avatar.url
-            embed = discord.Embed(
-                title = f"Playlist Added to Queue",
-                description = f'[{title}]({url}) ({length} songs)',
-                colour = Color.green()
-            )
-            thumbnail = img
-            embed.set_thumbnail(url=thumbnail)
-            embed.set_footer(text=f'Playlist added by {str(author)}',icon_url=avatar)
-            return embed
-        except Exception as e:
-            print(e)
-            return
+        title = playlist.name
+        length = len(playlist.tracks)
+        author = ctx.author
+        avatar = author.display_avatar.url
+        embed = discord.Embed(
+            title = f"Playlist Added to Queue",
+            description = f'[{title}]({url}) ({length} songs)',
+            colour = Color.green()
+        )
+        thumbnail = img
+        embed.set_thumbnail(url=thumbnail)
+        embed.set_footer(text=f'Playlist added by {str(author)}',icon_url=avatar)
+        return embed
 
     def convertDuration(self, duration):
+        duration = duration/1000
         minutes = str(math.floor(duration/60))
-        seconds = str(int(duration%60))
+        intermediate_seconds = math.floor(duration%60)
+        if(intermediate_seconds != 0):
+            intermediate_seconds = intermediate_seconds - 1
+        seconds = str(intermediate_seconds)
+
         if len(seconds) == 1:
             seconds = "0" + seconds
         return f"{minutes}:{seconds}"
@@ -170,10 +179,9 @@ class Music(commands.Cog):
         return options
 
 
-    async def sendDM(self, func, error):
+    async def sendDM(self, func):
         user = await self.bot.fetch_user(404491098946273280)
-        message = f"Error in:  \n"
-        message += error
+        message = f"Error in: {func} \n"
         await user.send(message)
     
     async def joinVC(self,ctx, channel):
@@ -190,63 +198,52 @@ class Music(commands.Cog):
         result = True
         return result
     async def chooseSong(self,ctx,query,is_playnow=False):
-        try:
-            search_list = None
-            search_list = await wavelink.YouTubeTrack.search(query)
-            if not search_list:
-                await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
-                return
-            #Soundcloud Disabled until I can find a fix for the 30 second cutoff
-            i=0
-            length = 10
-            if len(search_list) < 10:
-                length = len(search_list)
-            message=""
-            emoji_list = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"]
-            for track in search_list[:length]:
-                title = track.title
-                duration = self.convertDuration(track.duration)
-                link = track.uri
-                message += f"{emoji_list[i]} [{title}]({link}) ({duration})\n\n"
-                i+=1
-            embed = discord.Embed(
-                title = f"Youtube Search Results For: {query}",
-                description = message,
-                colour = Color.green()
-            )
-            select = Select(
-                placeholder="Choose a song",
-                min_values="1",
-                max_values="1",
-                options=self.buildResponse(length)
-            )
-            
-            async def SongChosen(interaction):
-                await interaction.response.defer()
-                song_number = int(select.values[0])
-                select.placeholder = f"Song {song_number} chosen"
-                select.disabled = True
-                new_view = View()
-                new_view.add_item(select)
-                await msg.edit(embed=embed,view=new_view)
-                player: wavelink.Player = ctx.voice_client
-                selection = search_list[song_number-1]
-                await self.route(ctx,selection,player,is_playnow)
-            select.callback = SongChosen
-            view = View()
-            view.add_item(select)
-            msg = await ctx.send(embed=embed,view=view)
-            return 
-        except Exception as e:
-            embed = discord.Embed(title=f"Something went wrong while searching for: {query}", color=Color.red())
-            await ctx.send(embed=embed)
-            vars = {
-                    "error": e,
-                    "query": query,
-                    "search": search_list
-                }
-            await self.sendDM("play_command",vars)
+        search_list = None
+        search_list = await wavelink.YouTubeTrack.search(query)
+        if not search_list:
+            await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
             return
+        #Soundcloud Disabled until I can find a fix for the 30 second cutoff
+        i=0
+        length = 10
+        if len(search_list) < 10:
+            length = len(search_list)
+        message=""
+        emoji_list = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"]
+        for track in search_list[:length]:
+            title = track.title
+            duration = self.convertDuration(track.duration)
+            link = track.uri
+            message += f"{emoji_list[i]} [{title}]({link}) ({duration})\n\n"
+            i+=1
+        embed = discord.Embed(
+            title = f"Youtube Search Results For: {query}",
+            description = message,
+            colour = Color.green()
+        )
+        select = Select(
+            placeholder="Choose a song",
+            min_values="1",
+            max_values="1",
+            options=self.buildResponse(length)
+        )
+        
+        async def SongChosen(interaction):
+            await interaction.response.defer()
+            song_number = int(select.values[0])
+            select.placeholder = f"Song {song_number} chosen"
+            select.disabled = True
+            new_view = View()
+            new_view.add_item(select)
+            await msg.edit(embed=embed,view=new_view)
+            player: wavelink.Player = ctx.voice_client
+            selection = search_list[song_number-1]
+            await self.route(ctx,selection,player,is_playnow)
+        select.callback = SongChosen
+        view = View()
+        view.add_item(select)
+        msg = await ctx.send(embed=embed,view=view)
+        return 
 
     async def validatePlay(self,ctx):
         if ctx.author.voice:
@@ -277,14 +274,9 @@ class Music(commands.Cog):
         return True
     
     async def playSong(self,ctx,search,player):
-        try:
-            track = await player.play(search)
-            embed = self.nowPlaying(ctx,track)
-            await ctx.send(embed=embed)
-        except Exception as e:
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            print(exc_type, fname, exc_tb.tb_lineno,e)
+        track = await player.play(search)
+        embed = self.nowPlaying(ctx,track)
+        await ctx.send(embed=embed)
 
     async def addToQueue(self,ctx,search,player):
         await player.queue.put_wait(search)
@@ -303,52 +295,41 @@ class Music(commands.Cog):
             await self.playSong(ctx,track,player)
     
     async def omniPlayer(self,ctx,query,is_playnow):
-        try:
-            if len(query) == 0:
-                await ctx.send("Please enter a search term")
-                return
-            if not await self.validatePlay(ctx):
-                return
-            if not validators.url(query):
-                #Play will occur later, this function only creates an embed menu to select the song
-                await self.chooseSong(ctx, query,is_playnow)
-                return
-            else:
-                #When a url is given, play the song immediately
-                player: wavelink.Player = ctx.voice_client
-                if "playlist?" in query:
-                    if is_playnow:
-                        is_playnow = False
-                    #PLAYLIST TECH
-                    playlist = await wavelink.YouTubePlaylist.search(query)
-                    thumbnail = playlist.tracks[0].thumbnail
-                    embed = self.addedPlaylistToQueue(ctx,playlist,query,thumbnail)
-                    await ctx.send(embed=embed)
-                    for track in playlist.tracks:
-                        partial_track= wavelink.PartialTrack(track.title)
-                        await self.route(ctx,partial_track,player,is_playnow)
+        if len(query) == 0:
+            await ctx.send("Please enter a search term")
+            return
+        if not await self.validatePlay(ctx):
+            return
+        if not validators.url(query):
+            #Play will occur later, this function only creates an embed menu to select the song
+            await self.chooseSong(ctx, query,is_playnow)
+            return
+        else:
+            #When a url is given, play the song immediately
+            player: wavelink.Player = ctx.voice_client
+            if "playlist?" in query:
+                if is_playnow:
+                    is_playnow = False
+                #PLAYLIST TECH
+                playlist = await wavelink.YouTubePlaylist.search(query)
+                thumbnail = playlist.tracks[0].thumbnail
+                embed = self.addedPlaylistToQueue(ctx,playlist,query,thumbnail)
+                await ctx.send(embed=embed)
+                for track in playlist.tracks:
+                    partial_track= wavelink.PartialTrack(track.title)
+                    await self.route(ctx,partial_track,player,is_playnow)
 
-                else:
-                    track = None
-                    try:
-                        track = await wavelink.YouTubeTrack.search(query)
-                    except:
-                        track = await wavelink.node.get_tracks(query, cls=wavelink.Track)
-                    if not track:
-                        await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
-                        return
-                    track = track[0]
-                    await self.route(ctx,track,player,is_playnow)
-                return
-        except Exception as e:
-            print(e)
-            embed = discord.Embed(title=f"Something went wrong while searching for: {query}", color=Color.red())
-            await ctx.send(embed=embed)
-            vars = {
-                    "error": e,
-                    "query": query,
-                }
-            await self.sendDM("play_command",vars)
+            else:
+                track = None
+                try:
+                    track = await wavelink.YouTubeTrack.search(query)
+                except:
+                    track = await wavelink.node.get_tracks(query, cls=wavelink.Track)
+                if not track:
+                    await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
+                    return
+                track = track[0]
+                await self.route(ctx,track,player,is_playnow)
             return
 
     @commands.command(
@@ -450,7 +431,7 @@ class Music(commands.Cog):
         player: wavelink.Player = ctx.voice_client
         if not (await self.validate(ctx,player)):
             return
-        await ctx.send(f"Skipped track: {player.track.title}")
+        await ctx.send(f"Skipped track: {player.current.title}")
         await player.stop()
 
     @commands.command(
@@ -459,7 +440,6 @@ class Music(commands.Cog):
         help=""
     )
     async def display_queue_command(self, ctx: commands.Context,*, page: str=""):
-        try:
             player: wavelink.Player = ctx.voice_client
             if not (await self.validate(ctx,player)):
                 return
@@ -495,11 +475,6 @@ class Music(commands.Cog):
             except:
                 embed = discord.Embed(title=f"There are only {pages} page(s) in the queue", color=Color.red())
                 await ctx.send(embed=embed)
-        except Exception as e:
-            embed = discord.Embed(title=f"Something went wrong while displaying the queue", color=Color.red())
-            await ctx.send(embed=embed)
-            await self.sendDM("display_queue_command",e)
-            return
   
     @commands.command(
         name="loop",
@@ -513,20 +488,20 @@ class Music(commands.Cog):
         id = int(ctx.guild.id)
         self.is_looping[id] = not self.is_looping[id]
         if self.is_looping[id]:
-            await ctx.send(f"Now looping {player.track.title}")
+            await ctx.send(f"Now looping {player.current.title}")
         else:
-            await ctx.send(f"No longer looping {player.track.title}")
+            await ctx.send(f"No longer looping {player.current.title}")
 
     @commands.command(
         name="seek",
         aliases=[],
         help=""
     )
-    async def seek_command(self, ctx: commands.Context, to):
+    async def seek_command(self, ctx: commands.Context, to=""):
         player: wavelink.Player = ctx.voice_client
         if not (await self.validate(ctx,player)):
             return
-        length = player.track.length
+        length = player.current.length
         try:
             seconds = int(to)
         except:
@@ -534,6 +509,7 @@ class Music(commands.Cog):
         if (seconds <=0 or seconds >= length):
             seconds = 0
         await player.seek(seconds*1000)
+        await ctx.send(f"Seeking to ({self.convertDuration(seconds)}) in the song")
 
     @commands.command(
         name="previous",
@@ -542,25 +518,19 @@ class Music(commands.Cog):
     )
     async def previous_command(self, ctx: commands.Context, now=""):
         id = int(ctx.guild.id)
-        try:
-            player: wavelink.Player = ctx.voice_client
-            if not (await self.validatePlay(ctx)):
-                return
-            previous = self.previous_song[id]
-            if previous == None:
-                await ctx.send(f"No previous song found")
-                return
-            else:
-                is_playingnow = False
-                if now == "now":
-                    is_playingnow = True
-                await self.route(ctx,previous,player,is_playingnow)
-            
-        except Exception as e:
-            embed = discord.Embed(title=f"Something went wrong while playing the previous song the queue", color=Color.red())
-            await ctx.send(embed=embed)
-            await self.sendDM("previous_command",e)
+        player: wavelink.Player = ctx.voice_client
+        previous = self.previous_song[id]
+        if previous == None:
+            await ctx.send(f"No previous song found")
             return
+        if not (await self.validatePlay(ctx)):
+            return
+        
+        is_playingnow = False
+        if now == "now":
+            is_playingnow = True
+        await self.route(ctx,previous,player,is_playingnow)
+        
         
 
     @commands.command(
@@ -627,7 +597,7 @@ class Music(commands.Cog):
         player: wavelink.Player = ctx.voice_client
         if not (await self.validate(ctx,player)):
             return
-        embed = self.nowPlaying(ctx, player.track)
+        embed = self.nowPlaying(ctx, player.current)
         await ctx.send(embed=embed)
 
     @commands.command(
