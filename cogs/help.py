@@ -34,9 +34,3 @@ class Help(commands.Cog):
             embed.add_field(name='Restart', value= 'Begins playing the current song from the beginning\n\nUsage: {-restart/-res}', inline=False)
 
             await author.send(embed=embed)
-
-
-
-async def setup(bot):
-    await bot.add_cog(Help(bot))
-    print("Loaded help cog")

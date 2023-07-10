@@ -5,26 +5,47 @@ import asyncio
 import logging
 import sys
 import time
+from cogs.help import Help
+from cogs.music import Music
+import wavelink
 
 from discord.ext import commands
 
 load_dotenv()
 password = str(os.getenv("bot_key"))
 
-bot = commands.Bot(command_prefix = '-', intents = discord.Intents.all(), case_insensitive = True)
-bot.remove_command('help')
+server_pass = str(os.getenv("password"))
+server_host = str(os.getenv("localhost"))
 
-async def load_extensions():
-    for filename in os.listdir("./cogs"):
-        if filename.endswith(".py"):
-            # cut off the .py from the file name
-            await bot.load_extension(f"cogs.{filename[:-3]}")
+
+class Bot(commands.Bot):
+
+    def __init__(self) -> None:
+        intents = discord.Intents.default()
+        intents.message_content = True
+        case_insensitive = True
+
+        super().__init__(command_prefix='-', intents=intents,case_insensitive=case_insensitive)
+
+    async def on_ready(self) -> None:
+        print("Bot Online")
+
+    async def setup_hook(self) -> None:
+        node: wavelink.Node = wavelink.Node(uri="http://localhost:2333", password="youshallnotpass")
+        await wavelink.NodePool.connect(client=self, nodes=[node])
+        
+    async def on_wavelink_node_ready(self, node: wavelink.Node):
+        """Event fired when a node has finished connecting."""
+        print(f'Node: <{node.identifier}> is ready!')
 
 async def main():
+    bot = Bot()
+    bot.remove_command('help')
     async with bot:
-        await load_extensions()
+        await bot.add_cog(Music(bot))
+        await bot.add_cog(Help(bot))
         await bot.start(password)
 
 if __name__ == "__main__":
-    time.sleep(20)
+    # time.sleep(20)
     asyncio.run(main())

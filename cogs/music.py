@@ -7,22 +7,16 @@ import math
 from discord.ui import Select,View
 from discord import Color
 import validators
-import traceback
 import random
 
 class Music(commands.Cog):
     def __init__(self,bot: commands.Bot):
         self.bot = bot
-        bot.loop.create_task(self.create_nodes())
 
         self.join_context = {}
         self.is_looping = {}
         self.is_repeating_playlist = {}
         self.previous_song = {}
-        self.server_pass = str(os.getenv("password"))
-        self.server_port = str(os.getenv("port"))
-        self.server_host = str(os.getenv("localhost"))
-
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -33,7 +27,6 @@ class Music(commands.Cog):
             self.is_looping[id] = False
             self.is_repeating_playlist[id] = False
             self.previous_song[id] = None
-        print("Bot Online")
     
     @commands.Cog.listener()
     async def on_command_error(self,ctx,error):
@@ -41,7 +34,10 @@ class Music(commands.Cog):
             await ctx.send("That command does not exist. Use -help for list of all available commands")
             return
         else:
-            await self.sendDM("Generic",error)
+            command_name = ctx.invoked_with
+            embed = discord.Embed(title=f"Something went wrong with {command_name}", color=Color.red())
+            await ctx.send(embed=embed)
+            await self.sendDM(command_name,error)
             return
 
 
@@ -58,12 +54,6 @@ class Music(commands.Cog):
                 self.is_repeating_playlist[id] = False
                 self.previous_song[id] = None
                 await join_context.channel.send(f"Realm Tunes left because there were no members remaining in ``{before.channel}``")
-
-
-    @commands.Cog.listener()
-    async def on_wavelink_node_ready(self, node: wavelink.Node):
-        """Event fired when a node has finished connecting."""
-        print(f'Node: <{node.identifier}> is ready!')
 
     @commands.Cog.listener()
     async def on_wavelink_track_end(self, player: wavelink.Player, track, reason):
@@ -94,10 +84,6 @@ class Music(commands.Cog):
             await player.seek(0)
         else:
             await player.stop()
-
-    #Helper functions
-    async def cog_command_error(self, ctx, error):
-        print(error)
     
     async def cog_check(self,ctx):
         if isinstance(ctx.channel, discord.DMChannel):
@@ -157,8 +143,6 @@ class Music(commands.Cog):
             embed.set_footer(text=f'Playlist added by {str(author)}',icon_url=avatar)
             return embed
         except Exception as e:
-            error = traceback.format_exc()
-            print(error)
             print(e)
             return
 
@@ -186,23 +170,11 @@ class Music(commands.Cog):
         return options
 
 
-    async def sendDM(self,func, error):
-        #vars:dict for previous iteration
+    async def sendDM(self, func, error):
         user = await self.bot.fetch_user(404491098946273280)
-        message = f"Error in: {func} \n"
+        message = f"Error in:  \n"
         message += error
-        # for var in vars:
-        #     message += f"\n{var}: {vars[var]}"
         await user.send(message)
-
-    async def create_nodes(self):
-        """Connect to our Lavalink nodes."""
-        
-        await self.bot.wait_until_ready()
-        await wavelink.NodePool.create_node(bot=self.bot,
-                                            host=self.server_host,
-                                            port=self.server_port,
-                                            password=self.server_pass)
     
     async def joinVC(self,ctx, channel):
         id = int(ctx.guild.id)
@@ -211,7 +183,7 @@ class Music(commands.Cog):
         if player is not None and player.is_connected():
             await player.move_to(channel)
         else:
-            result = await channel.connect(cls=wavelink.Player)
+            result = await channel.connect(cls=wavelink.Player,self_deaf=True)
             if result == None:
                 return result
         self.join_context[id] = ctx
@@ -220,7 +192,10 @@ class Music(commands.Cog):
     async def chooseSong(self,ctx,query,is_playnow=False):
         try:
             search_list = None
-            search_list = await wavelink.YouTubeTrack.search(query=query)
+            search_list = await wavelink.YouTubeTrack.search(query)
+            if not search_list:
+                await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
+                return
             #Soundcloud Disabled until I can find a fix for the 30 second cutoff
             i=0
             length = 10
@@ -262,9 +237,6 @@ class Music(commands.Cog):
             view.add_item(select)
             msg = await ctx.send(embed=embed,view=view)
             return 
-        except IndexError:
-            await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
-            return
         except Exception as e:
             embed = discord.Embed(title=f"Something went wrong while searching for: {query}", color=Color.red())
             await ctx.send(embed=embed)
@@ -342,45 +314,41 @@ class Music(commands.Cog):
                 await self.chooseSong(ctx, query,is_playnow)
                 return
             else:
-                
                 #When a url is given, play the song immediately
                 player: wavelink.Player = ctx.voice_client
                 if "playlist?" in query:
                     if is_playnow:
                         is_playnow = False
                     #PLAYLIST TECH
-                    playlist = await wavelink.YouTubePlaylist.search(query=query)
+                    playlist = await wavelink.YouTubePlaylist.search(query)
                     thumbnail = playlist.tracks[0].thumbnail
                     embed = self.addedPlaylistToQueue(ctx,playlist,query,thumbnail)
                     await ctx.send(embed=embed)
                     for track in playlist.tracks:
-                        partial_track= wavelink.PartialTrack(query=track.title)
+                        partial_track= wavelink.PartialTrack(track.title)
                         await self.route(ctx,partial_track,player,is_playnow)
 
                 else:
                     track = None
                     try:
-                        track = await wavelink.YouTubeTrack.search(query=query)
+                        track = await wavelink.YouTubeTrack.search(query)
                     except:
-                        track = await wavelink.node.get_tracks(query=query, cls=wavelink.Track)
+                        track = await wavelink.node.get_tracks(query, cls=wavelink.Track)
                     if not track:
-                        raise IndexError
+                        await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
+                        return
                     track = track[0]
                     await self.route(ctx,track,player,is_playnow)
                 return
-        except IndexError:
-            await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
-            return
         except Exception as e:
+            print(e)
             embed = discord.Embed(title=f"Something went wrong while searching for: {query}", color=Color.red())
             await ctx.send(embed=embed)
-            error = traceback.format_exc()
-            print(error)
-            # vars = {
-            #         "error": e,
-            #         "query": query,
-            #     }
-            await self.sendDM("play_command",error)
+            vars = {
+                    "error": e,
+                    "query": query,
+                }
+            await self.sendDM("play_command",vars)
             return
 
     @commands.command(
@@ -530,13 +498,7 @@ class Music(commands.Cog):
         except Exception as e:
             embed = discord.Embed(title=f"Something went wrong while displaying the queue", color=Color.red())
             await ctx.send(embed=embed)
-            error = traceback.format_exc()
-            print(error)
-            # vars = {
-            #         "error": e,
-            #         "query": query,
-            #     }
-            await self.sendDM("display_queue_command",error)
+            await self.sendDM("display_queue_command",e)
             return
   
     @commands.command(
@@ -597,13 +559,7 @@ class Music(commands.Cog):
         except Exception as e:
             embed = discord.Embed(title=f"Something went wrong while playing the previous song the queue", color=Color.red())
             await ctx.send(embed=embed)
-            error = traceback.format_exc()
-            print(error)
-            # vars = {
-            #         "error": e,
-            #         "query": query,
-            #     }
-            await self.sendDM("previous_command",error)
+            await self.sendDM("previous_command",e)
             return
         
 
@@ -704,7 +660,4 @@ class Music(commands.Cog):
     #         exc_type, exc_obj, exc_tb = sys.exc_info()
     #         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     #         print(exc_type, fname, exc_tb.tb_lineno,e)
-        
-async def setup(bot):
-    await bot.add_cog(Music(bot))
-    print("Loaded music cog")
+    
