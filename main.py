@@ -14,7 +14,7 @@ from discord.ext import commands
 load_dotenv()
 password = str(os.getenv("BOT_KEY"))
 
-server_pass = str(os.getenv("SERVER_PASS"))
+server_pass = str(os.getenv("SERVER_KEY"))
 server_host = str(os.getenv("SERVER_HOST"))
 
 
