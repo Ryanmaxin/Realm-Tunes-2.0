@@ -1,6 +1,6 @@
 # Realm-Tunes-2.0
 
-**A Discord music bot built with the Discord.py API, providing 24/7 music for over 850 users across 7 servers.**
+**A Discord music bot built with the Discord.py API, providing 24/7 music for over 350 users across 7 servers.**
 
 <img width="745" alt="image" src="https://user-images.githubusercontent.com/90675771/236710016-529802d2-65b4-42ab-b03a-07a6a2686db1.png">
 
