@@ -1,6 +1,6 @@
 # Realm-Tunes-2.0
 
-**A Discord music bot built with the Discord.py API, providing 24/7 music for over 250 users across 6 servers.**
+**A Discord music bot built with the Discord.py API, providing 24/7 music for over 850 users across 7 servers.**
 
 <img width="745" alt="image" src="https://user-images.githubusercontent.com/90675771/236710016-529802d2-65b4-42ab-b03a-07a6a2686db1.png">
 
@@ -46,7 +46,7 @@ Clears the queue and ends the current song.
 
 ![ezgif-1-ca6df1d262](https://user-images.githubusercontent.com/90675771/236713370-42faa191-0582-4daa-8be4-e5368a955351.gif)
 
-### Toggle
+### Pause
 Switches between pausing and unpausing the music.
 
 ![ezgif-3-2ceb0cb54d](https://user-images.githubusercontent.com/90675771/236712245-c0c6e4b7-cb80-44ce-b879-6916d5c8901c.gif)
@@ -56,7 +56,7 @@ Skips the current song.
 
 ![ezgif-1-5ba43919b9](https://user-images.githubusercontent.com/90675771/236713946-1b591f57-79fa-4cbf-912c-4026164b0a61.gif)
 
-### Display Queue
+### Queue
 Shows the current queue. Add a number to select specific page (when more then 10 songs)
 
 ![ezgif-1-080315ea65](https://user-images.githubusercontent.com/90675771/236712797-cc44b6d3-ce22-40f3-a9e4-9e6940b6594d.gif)
@@ -91,7 +91,7 @@ Sets the volume of Realm Tunes to the specified amount
 
 ![ezgif-1-8f439a4919](https://user-images.githubusercontent.com/90675771/236714403-7e33957b-5662-4772-b14d-f9d90b833046.gif)
 
-### Currently Playing
+### Current
 Shows the song that is currently playing
 
 ![ezgif-1-e7b0d53bcd](https://user-images.githubusercontent.com/90675771/236713216-18071f4d-c17c-45a9-bfe1-ef4191463307.gif)
