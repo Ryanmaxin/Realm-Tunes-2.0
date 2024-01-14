@@ -16,7 +16,11 @@ class Utils(commands.Cog):
     async def sync(self, ctx):
         print("syncing...")
         guild = ctx.guild
-        ctx.bot.tree.copy_global_to(guild=guild)
-        synced = await ctx.bot.tree.sync(guild=guild)
-        await ctx.send(f"Synced {len(synced)} command(s).")
+        try:
+            # ctx.bot.tree.copy_global_to(guild=guild)
+            synced = await ctx.bot.tree.sync()
+            await ctx.send(f"Synced {len(synced)} command(s).")
+        except Exception as e:
+            print(f"sync error: {e}")
+        print("synced!")
             

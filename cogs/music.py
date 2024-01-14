@@ -292,7 +292,6 @@ class Music(commands.Cog):
 
     
     async def route(self,ctx,track,player,is_playnow,is_playlist = False):
-        print("ADDED2!")
         if (player.is_playing() or player.is_paused()) and not is_playnow:
             await self.addToQueue(ctx,track,player,is_playlist)
         else:
@@ -374,18 +373,19 @@ class Music(commands.Cog):
     
     @app_commands.command(
         name="play",
-        description="Realm Tunes will immediately queue up the query if it is a url/playlist, otherwise it will search for the query on YouTube and create a menu where you can choose a song."
+        description="Queue the song designated in the query if it is a url, otherwise brings up a menu to choose a song."
     )
-    async def play_command(self, ctx: discord.Interaction, *, query: str=""):
+    @app_commands.describe(query='Can be a url (including playlist) to be played directly, or a song title to be searched on youtube.')
+    async def play_command(self, ctx: discord.Interaction, query: str):
         is_nowplaying = False
         await self.omniPlayer(ctx,query,is_nowplaying)
 
 
     @app_commands.command(
         name="play_now",
-        description="Identical to Play, except the desired song will be play immediately even if there is another song playing."
+        description="Like Play, except the desired song will be play immediately even if there is another song playing."
     )
-    async def play_now_command(self, ctx: discord.Interaction, *, query: str=""):
+    async def play_now_command(self, ctx: discord.Interaction, query: str):
         is_nowplaying = True
         await self.omniPlayer(ctx,query,is_nowplaying)
 
@@ -434,7 +434,7 @@ class Music(commands.Cog):
         name="queue",
         description="Shows the current queue. Add a number to select specific page (when more then 10 songs)"
     )
-    async def queue_command(self, ctx: discord.Interaction,*, page: int=1):
+    async def queue_command(self, ctx: discord.Interaction,*, page_number: int=1):
             player: wavelink.Player = ctx.guild.voice_client
             if not (await self.validate(ctx,player)):
                 return
@@ -444,14 +444,14 @@ class Music(commands.Cog):
                 return
             message=""
             embed = None
-            # try:
-            #     page_num = int(page)
-            # except:
-            #     page_num = 1
-            if page_num <= 0:
-                page_num = 1
-            start = page_num * 10 - 10
+            if page_number <= 0:
+                page_number = 1
+            start = page_number * 10 - 10
             pages = math.ceil(queue.count / 10)
+            if page_number > pages:
+                embed = discord.Embed(title=f"There are only {pages} page(s) in the queue", color=Color.red())
+                await ctx.response.send_message(embed=embed)
+                return
             for num in range(0,10):
                 current_song = start+num
                 try:
@@ -461,19 +461,16 @@ class Music(commands.Cog):
                 title = track.title
                 message += f"({current_song+1}) {title}\n\n"
                 embed = discord.Embed(
-                    title = f"Music Queue - Page {page_num}/{pages}",
+                    title = f"Music Queue - Page {page_number}/{pages}",
                     description = message,
                     colour = Color.green()
                 )
-            try:
-                await ctx.response.send_message(embed=embed)
-            except:
-                embed = discord.Embed(title=f"There are only {pages} page(s) in the queue", color=Color.red())
-                await ctx.response.send_message(embed=embed)
+            await ctx.response.send_message(embed=embed)
+                
   
     @app_commands.command(
         name="loop",
-        description="Shows the current queue. Add a number to select specific page (when more then 10 songs)"
+        description="Toggles on or off looping. looping repeats the current song after it ends."
     )
     async def loop_command(self, ctx: discord.Interaction):
         player: wavelink.Player = ctx.guild.voice_client
@@ -488,16 +485,13 @@ class Music(commands.Cog):
 
     @app_commands.command(
         name="seek",
+        description="Begins playing at the specified number of seconds into the song."
     )
-    async def seek_command(self, ctx: discord.Interaction, seconds:int=0):
+    async def seek_command(self, ctx: discord.Interaction, seconds:int):
         player: wavelink.Player = ctx.guild.voice_client
         if not (await self.validate(ctx,player)):
             return
         length = player.current.length
-        # try:
-        #     seconds = int(to)
-        # except:
-        #     seconds = 0
         if (seconds <=0 or seconds >= length):
             seconds = 0
         await player.seek(seconds*1000)
@@ -505,8 +499,13 @@ class Music(commands.Cog):
 
     @app_commands.command(
         name="previous",
+        description="Puts the previously played song into the queue. You can add 'now' to the end to play the song now."
     )
-    async def previous_command(self, ctx: discord.Interaction, now:str=""):
+    @app_commands.describe(priority='Whether to play the command immediately or just add it to the queue' )
+    @app_commands.choices(priority=[
+        discord.app_commands.Choice(name='now', value=1),
+        discord.app_commands.Choice(name='queue', value=0)])
+    async def previous_command(self, ctx: discord.Interaction, priority:discord.app_commands.Choice[int]=0):
         id = int(ctx.guild.id)
         player: wavelink.Player = ctx.guild.voice_client
         previous = self.previous_song[id]
@@ -517,7 +516,7 @@ class Music(commands.Cog):
             return
         
         is_playingnow = False
-        if now == "now":
+        if priority:
             is_playingnow = True
         await self.route(ctx,previous,player,is_playingnow)
         
@@ -525,6 +524,7 @@ class Music(commands.Cog):
 
     @app_commands.command(
         name="repeat",
+        description="Toggles on or off repeating the current queue."
     )
     async def repeat_command(self, ctx: discord.Interaction):
         player: wavelink.Player = ctx.guild.voice_client
@@ -539,6 +539,7 @@ class Music(commands.Cog):
 
     @app_commands.command(
         name="shuffle",
+        description="Puts the current queue in a random order."
     )
     async def shuffle_command(self, ctx: discord.Interaction):
         player: wavelink.Player = ctx.guild.voice_client
@@ -550,8 +551,9 @@ class Music(commands.Cog):
 
     @app_commands.command(
         name="volume",
+        description="Sets the volume of Realm Tunes to the specified amount."
     )
-    async def volume_command(self, ctx: discord.Interaction, to:int=None):
+    async def volume_command(self, ctx: discord.Interaction, percent:int):
         player: wavelink.Player = ctx.guild.voice_client
         if not (await self.validate(ctx,player)):
             return
@@ -560,22 +562,23 @@ class Music(commands.Cog):
         # except:
         #     await ctx.response.send_message("Volume must be a whole number between 0 and 1000 (ex: 50)")
         #     return 
-        if to > 1000:
+        if percent > 1000:
             await ctx.response.send_message("Volume must be between 0 and 1000")
             return
-        elif to < 0:
+        elif percent < 0:
             await ctx.response.send_message("Volume must be between 0 and 1000")
             return
-        elif to > 100:
+        elif percent > 100:
             embed = discord.Embed(title=f"Warning: setting volume over 100% is not recommended. Please be careful!", color=Color.red())
             await ctx.response.send_message(embed=embed)
-        await player.set_volume(to)
-        await ctx.response.send_message(f"Set volume to {to}%")
+        await player.set_volume(percent)
+        await ctx.response.send_message(f"Set volume to {percent}%")
     
     @app_commands.command(
-        name="currently_playing",
+        name="current",
+        description="Shows the song that is currently playing"
     )
-    async def currently_playing_command(self, ctx: discord.Interaction):
+    async def current_command(self, ctx: discord.Interaction):
         player: wavelink.Player = ctx.guild.voice_client
         if not (await self.validate(ctx,player)):
             return
@@ -584,6 +587,7 @@ class Music(commands.Cog):
 
     @app_commands.command(
         name="restart",
+        description="Begins playing the current song from the beginning"
     )
     async def restart_command(self, ctx: discord.Interaction):
         player: wavelink.Player = ctx.guild.voice_client
