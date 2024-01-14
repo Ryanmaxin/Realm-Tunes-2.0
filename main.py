@@ -7,6 +7,8 @@ import sys
 import time
 from cogs.help import Help
 from cogs.music import Music
+from cogs.utils import Utils
+from cogs.exceptions import ExceptionHandler
 import wavelink
 
 from discord.ext import commands
@@ -24,7 +26,7 @@ class Bot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True
         case_insensitive = True
-        activity = discord.Activity(type=discord.ActivityType.listening, name="-help")
+        activity = discord.Activity(type=discord.ActivityType.listening, name="/help")
         super().__init__(command_prefix='-', intents=intents,case_insensitive=case_insensitive,activity=activity)
 
     async def on_ready(self) -> None:
@@ -47,6 +49,10 @@ async def main():
         print("Initialized Music Cog")
         await bot.add_cog(Help(bot))
         print("Initialized Help Cog")
+        await bot.add_cog(Utils(bot))
+        print("Initialized Utils Cog")
+        await bot.add_cog(ExceptionHandler(bot))
+        print("Initialized ExceptionHandler Cog")
         await bot.start(password)
 
 if __name__ == "__main__":

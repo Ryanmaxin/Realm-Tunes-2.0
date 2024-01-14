@@ -1,6 +1,8 @@
+import string
 import discord
 import wavelink
 from discord.ext import commands
+from discord import app_commands
 import sys
 import math
 from discord.ui import Select,View
@@ -31,13 +33,13 @@ class Music(commands.Cog):
     @commands.Cog.listener()
     async def on_command_error(self,ctx,error):
         if isinstance(error, commands.CommandNotFound):
-            await ctx.send("That command does not exist. Use -help for list of all available commands")
+            await ctx.response.send_message("That command does not exist. Use -help for list of all available commands")
             return
         else:
             command_name = ctx.invoked_with
 
             embed = discord.Embed(title=f"Something went wrong with {command_name}", color=Color.red())
-            await ctx.send(embed=embed)
+            await ctx.response.send_message(embed=embed)
 
             error_type = type(error)
             error_traceback = error.__traceback__
@@ -80,8 +82,8 @@ class Music(commands.Cog):
             return
         if not str(reason) == "FINISHED" and not str(reason) == "STOPPED":
             embed = discord.Embed(title=f"Something went wrong while playing: {track.title}", color=Color.red())
-            await ctx.send(embed=embed)
-            await self.sendDM("on_wavelink_track_end(unexpected reason)")
+            await ctx.response.send_message(embed=embed)
+            await self.sendDM(f"{reason}")
             return
         if self.is_looping[id]:
             await self.playSong(ctx,track,player)
@@ -97,7 +99,7 @@ class Music(commands.Cog):
     
     async def cog_check(self,ctx):
         if isinstance(ctx.channel, discord.DMChannel):
-            await ctx.send("Sorry, music commands are not available in DMs. Please join a voice channel in a server containing Realm Tunes to use music commands!")
+            await ctx.response.send_message("Sorry, music commands are not available in DMs. Please join a voice channel in a server containing Realm Tunes to use music commands!")
             return False
         return True
     
@@ -105,7 +107,7 @@ class Music(commands.Cog):
         title = track.title
         duration = self.convertDuration(track.duration)
         link = track.uri
-        author = ctx.author
+        author = ctx.user
         avatar = author.display_avatar.url
 
         embed = discord.Embed(
@@ -123,7 +125,7 @@ class Music(commands.Cog):
         title = track.title
         duration = self.convertDuration(track.duration)
         link = track.uri
-        author = ctx.author
+        author = ctx.user
         avatar = author.display_avatar.url
 
         embed = discord.Embed(
@@ -140,7 +142,7 @@ class Music(commands.Cog):
     def addedPlaylistToQueue(self,ctx,playlist,url,img):
         title = playlist.name
         length = len(playlist.tracks)
-        author = ctx.author
+        author = ctx.user
         avatar = author.display_avatar.url
         embed = discord.Embed(
             title = f"Playlist Added to Queue",
@@ -186,10 +188,10 @@ class Music(commands.Cog):
         message = f"Error in: {func} \n"
         await user.send(message)
     
-    async def joinVC(self,ctx, channel):
+    async def joinVC(self,ctx: discord.Interaction, channel):
         id = int(ctx.guild.id)
         result = None
-        player: wavelink.Player = ctx.voice_client
+        player: wavelink.Player = ctx.guild.voice_client
         if player is not None and player.is_connected():
             await player.move_to(channel)
         else:
@@ -199,11 +201,11 @@ class Music(commands.Cog):
         self.join_context[id] = ctx
         result = True
         return result
-    async def chooseSong(self,ctx,query,is_playnow=False):
+    async def chooseSong(self,ctx: discord.Interaction,query,is_playnow=False):
         search_list = None
         search_list = await wavelink.YouTubeTrack.search(query)
         if not search_list:
-            await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
+            await ctx.response.send_message(f"No results for search query: {query}\nPlease try a different search query")
             return
         #Soundcloud Disabled until I can find a fix for the 30 second cutoff
         i=0
@@ -230,31 +232,32 @@ class Music(commands.Cog):
             options=self.buildResponse(length)
         )
         
-        async def SongChosen(interaction):
+        async def SongChosen(interaction: discord.Interaction):
             await interaction.response.defer()
             song_number = int(select.values[0])
             select.placeholder = f"Song {song_number} chosen"
             select.disabled = True
             new_view = View()
             new_view.add_item(select)
-            await msg.edit(embed=embed,view=new_view)
-            player: wavelink.Player = ctx.voice_client
+            await interaction.message.edit(embed=embed,view=new_view)
+            player: wavelink.Player = ctx.guild.voice_client
             selection = search_list[song_number-1]
+            
             await self.route(ctx,selection,player,is_playnow)
         select.callback = SongChosen
         view = View()
         view.add_item(select)
-        msg = await ctx.send(embed=embed,view=view)
+        msg = await ctx.response.send_message(embed=embed,view=view)
         return 
 
-    async def validatePlay(self,ctx):
-        if ctx.author.voice:
-            user_channel = ctx.author.voice.channel
-            if not ctx.voice_client:
+    async def validatePlay(self,ctx: discord.Interaction):
+        if ctx.user.voice:
+            user_channel = ctx.user.voice.channel
+            if not ctx.guild.voice_client:
                 result = await self.joinVC(ctx,user_channel)
                 if result == None:
                     embed = discord.Embed(title=f"Something went wrong while connecting to the voice channel!", color=Color.red())
-                    await ctx.send(embed=embed)
+                    await ctx.response.send_message(embed=embed)
                     vars = {
                         "user_channel": user_channel,
                         "result": result
@@ -262,41 +265,42 @@ class Music(commands.Cog):
                     await self.sendDM("play",vars)
                     return False
         else:
-            await ctx.send("You must be connected to a voice channel to play music")
+            await ctx.response.send_message("You must be connected to a voice channel to play music")
             return False
         return True
 
     async def validate(self,ctx,player):
         if player == None:
-            await ctx.send("Realm Tunes is not connected to any voice channel")
+            await ctx.response.send_message("Realm Tunes is not connected to any voice channel")
             return False
         if not player.is_playing():
-            await ctx.send("Nothing is playing right now")
+            await ctx.response.send_message("Nothing is playing right now")
             return False
         return True
     
     async def playSong(self,ctx,search,player):
         track = await player.play(search)
         embed = self.nowPlaying(ctx,track)
-        await ctx.send(embed=embed)
+        await ctx.response.send_message(embed=embed)
 
     async def addToQueue(self,ctx,search,player,is_playlist=False):
         await player.queue.put_wait(search)
         len = player.queue.count
         if not is_playlist:
             embed = self.addedSongToQueue(ctx,search,len)
-            await ctx.send(embed=embed)
+            await ctx.response.send_message(embed=embed)
 
     
     async def route(self,ctx,track,player,is_playnow,is_playlist = False):
+        print("ADDED2!")
         if (player.is_playing() or player.is_paused()) and not is_playnow:
             await self.addToQueue(ctx,track,player,is_playlist)
         else:
             await self.playSong(ctx,track,player)
     
-    async def omniPlayer(self,ctx,query,is_playnow):
+    async def omniPlayer(self,ctx: discord.Interaction,query,is_playnow):
         if len(query) == 0:
-            await ctx.send("Please enter a search term")
+            await ctx.response.send_message("Please enter a search term")
             return
         if not await self.validatePlay(ctx):
             return
@@ -306,15 +310,15 @@ class Music(commands.Cog):
             return
         else:
             #When a url is given, play the song immediately
-            player: wavelink.Player = ctx.voice_client
-            if "playlist?" in query:
+            player: wavelink.Player = ctx.guild.voice_client
+            if "list=P" in query:
                 if is_playnow:
                     is_playnow = False
                 #PLAYLIST TECH
                 playlist = await wavelink.YouTubePlaylist.search(query)
                 thumbnail = playlist.tracks[0].thumbnail
                 embed = self.addedPlaylistToQueue(ctx,playlist,query,thumbnail)
-                await ctx.send(embed=embed)
+                await ctx.response.send_message(embed=embed)
                 for track in playlist.tracks:
                     await self.route(ctx,track,player,is_playnow,True)
 
@@ -325,133 +329,125 @@ class Music(commands.Cog):
                 except:
                     track = await wavelink.node.get_tracks(query, cls=wavelink.Track)
                 if not track:
-                    await ctx.send(f"No results for search query: {query}\nPlease try a different search query")
+                    await ctx.response.send_message(f"No results for search query: {query}\nPlease try a different search query")
                     return
                 track = track[0]
                 await self.route(ctx,track,player,is_playnow)
             return
 
-    @commands.command(
+    @app_commands.command(
         name="join",
-        aliases=['j'],
-        help=""
+        description="Realm Tunes joins your current vc if you are in one."
     )
-    async def join_command(self, ctx: commands.Context):
-        if ctx.author.voice:
-            user_channel = ctx.author.voice.channel
+    async def join_command(self, ctx: discord.Interaction):
+        if ctx.user.voice:
+            user_channel = ctx.user.voice.channel
             result = await self.joinVC(ctx,user_channel)
             if result == None:
                 embed = discord.Embed(title=f"Something went wrong while connecting to the voice channel!", color=Color.red())
-                await ctx.send(embed=embed)
+                await ctx.response.send_message(embed=embed)
                 vars = {
                     "user_channel": user_channel,
                     "result": result
                 }
                 await self.sendDM("join",vars)
             else:
-                await ctx.send(f'Realm Tunes joined ``{user_channel}``')
+                await ctx.response.send_message(f'Realm Tunes joined ``{user_channel}``')
         else:
-            await ctx.send("You must be connected to a voice channel")
+            await ctx.response.send_message("You must be connected to a voice channel")
 
-    @commands.command(
+    @app_commands.command(
         name="leave",
-        aliases=['l'],
-        help=""
+        description="Realm Tunes leaves his current vc."
     )
-    async def leave_command(self, ctx: commands.Context):
-        player: wavelink.Player = ctx.voice_client
+    async def leave_command(self, ctx: discord.Interaction):
+        player: wavelink.Player = ctx.guild.voice_client
         id = int(ctx.guild.id)
         if player is None:
-            await ctx.send("Realm Tunes is not connected to any voice channel")
+            await ctx.response.send_message("Realm Tunes is not connected to any voice channel")
             return
         await player.disconnect()
         self.is_looping[id] = False
         self.is_repeating_playlist[id] = False
         self.previous_song[id] = None
-        await ctx.send("Realm Tunes left the chat")
+        await ctx.response.send_message("Realm Tunes left the chat")
     
-    @commands.command(
+    @app_commands.command(
         name="play",
-        aliases=['p'],
-        help=""
+        description="Realm Tunes will immediately queue up the query if it is a url/playlist, otherwise it will search for the query on YouTube and create a menu where you can choose a song."
     )
-    async def play_command(self, ctx: commands.Context, *, query: str=""):
+    async def play_command(self, ctx: discord.Interaction, *, query: str=""):
         is_nowplaying = False
         await self.omniPlayer(ctx,query,is_nowplaying)
 
 
-    @commands.command(
+    @app_commands.command(
         name="play_now",
-        aliases=['pn','now'],
-        help=""
+        description="Identical to Play, except the desired song will be play immediately even if there is another song playing."
     )
-    async def play_now_command(self, ctx: commands.Context, *, query: str=""):
+    async def play_now_command(self, ctx: discord.Interaction, *, query: str=""):
         is_nowplaying = True
         await self.omniPlayer(ctx,query,is_nowplaying)
 
     
-    @commands.command(
+    @app_commands.command(
         name="clear",
-        aliases=['c'],
-        help=""
+        description="Clears the queue and ends the current song."
     )
-    async def clear_command(self, ctx: commands.Context):
-        player: wavelink.Player = ctx.voice_client
+    async def clear_command(self, ctx: discord.Interaction):
+        player: wavelink.Player = ctx.guild.voice_client
         if not (await self.validate(ctx,player)):
             return
 
         await player.stop()
         player.queue.clear()
-        await ctx.send("Playback stopped")
+        await ctx.response.send_message("Playback stopped")
     
-    @commands.command(
-        name="toggle",
-        aliases=['t'],
-        help=""
+    @app_commands.command(
+        name="pause",
+        description="Switches between pausing and unpausing the music."
     )
-    async def toggle_command(self, ctx: commands.Context):
-        player: wavelink.Player = ctx.voice_client
+    async def pause_command(self, ctx: discord.Interaction):
+        player: wavelink.Player = ctx.guild.voice_client
 
         if not (await self.validate(ctx,player)):
             return
         if player.is_paused():
             await player.resume()
-            await ctx.send("Playback resumed")
+            await ctx.response.send_message("Playback resumed")
         else:
             await player.pause()
-            await ctx.send("Playback paused")
+            await ctx.response.send_message("Playback paused")
 
-    @commands.command(
+    @app_commands.command(
         name="skip",
-        aliases=['s'],
-        help=""
+        description="Skips the current song."
     )
-    async def skip_command(self, ctx: commands.Context):
-        player: wavelink.Player = ctx.voice_client
+    async def skip_command(self, ctx: discord.Interaction):
+        player: wavelink.Player = ctx.guild.voice_client
         if not (await self.validate(ctx,player)):
             return
-        await ctx.send(f"Skipped track: {player.current.title}")
+        await ctx.response.send_message(f"Skipped track: {player.current.title}")
         await player.stop()
 
-    @commands.command(
-        name="display_queue",
-        aliases=['queue','q','dq'],
-        help=""
+    @app_commands.command(
+        name="queue",
+        description="Shows the current queue. Add a number to select specific page (when more then 10 songs)"
     )
-    async def display_queue_command(self, ctx: commands.Context,*, page: str=""):
-            player: wavelink.Player = ctx.voice_client
+    async def queue_command(self, ctx: discord.Interaction,*, page: int=1):
+            player: wavelink.Player = ctx.guild.voice_client
             if not (await self.validate(ctx,player)):
                 return
             queue = player.queue
             if queue.is_empty:
-                await ctx.send("The queue is empty")
+                await ctx.response.send_message("The queue is empty")
                 return
             message=""
             embed = None
-            try:
-                page_num = int(page)
-            except:
-                page_num = 1
+            # try:
+            #     page_num = int(page)
+            # except:
+            #     page_num = 1
             if page_num <= 0:
                 page_num = 1
             start = page_num * 10 - 10
@@ -470,57 +466,52 @@ class Music(commands.Cog):
                     colour = Color.green()
                 )
             try:
-                await ctx.send(embed=embed)
+                await ctx.response.send_message(embed=embed)
             except:
                 embed = discord.Embed(title=f"There are only {pages} page(s) in the queue", color=Color.red())
-                await ctx.send(embed=embed)
+                await ctx.response.send_message(embed=embed)
   
-    @commands.command(
+    @app_commands.command(
         name="loop",
-        aliases=[],
-        help=""
+        description="Shows the current queue. Add a number to select specific page (when more then 10 songs)"
     )
-    async def loop_command(self, ctx: commands.Context, to=None):
-        player: wavelink.Player = ctx.voice_client
+    async def loop_command(self, ctx: discord.Interaction):
+        player: wavelink.Player = ctx.guild.voice_client
         if not (await self.validate(ctx,player)):
             return
         id = int(ctx.guild.id)
         self.is_looping[id] = not self.is_looping[id]
         if self.is_looping[id]:
-            await ctx.send(f"Now looping {player.current.title}")
+            await ctx.response.send_message(f"Now looping {player.current.title}")
         else:
-            await ctx.send(f"No longer looping {player.current.title}")
+            await ctx.response.send_message(f"No longer looping {player.current.title}")
 
-    @commands.command(
+    @app_commands.command(
         name="seek",
-        aliases=[],
-        help=""
     )
-    async def seek_command(self, ctx: commands.Context, to=""):
-        player: wavelink.Player = ctx.voice_client
+    async def seek_command(self, ctx: discord.Interaction, seconds:int=0):
+        player: wavelink.Player = ctx.guild.voice_client
         if not (await self.validate(ctx,player)):
             return
         length = player.current.length
-        try:
-            seconds = int(to)
-        except:
-            seconds = 0
+        # try:
+        #     seconds = int(to)
+        # except:
+        #     seconds = 0
         if (seconds <=0 or seconds >= length):
             seconds = 0
         await player.seek(seconds*1000)
-        await ctx.send(f"Seeking to ({self.convertDuration(seconds*1000+1000)}) in the song")
+        await ctx.response.send_message(f"Seeking to ({self.convertDuration(seconds*1000+1000)}) in the song")
 
-    @commands.command(
+    @app_commands.command(
         name="previous",
-        aliases=["pp","prev"],
-        help=""
     )
-    async def previous_command(self, ctx: commands.Context, now=""):
+    async def previous_command(self, ctx: discord.Interaction, now:str=""):
         id = int(ctx.guild.id)
-        player: wavelink.Player = ctx.voice_client
+        player: wavelink.Player = ctx.guild.voice_client
         previous = self.previous_song[id]
         if previous == None:
-            await ctx.send(f"No previous song found")
+            await ctx.response.send_message(f"No previous song found")
             return
         if not (await self.validatePlay(ctx)):
             return
@@ -532,99 +523,89 @@ class Music(commands.Cog):
         
         
 
-    @commands.command(
+    @app_commands.command(
         name="repeat",
-        aliases=['r','re'],
-        help=""
     )
-    async def repeat_command(self, ctx: commands.Context):
-        player: wavelink.Player = ctx.voice_client
+    async def repeat_command(self, ctx: discord.Interaction):
+        player: wavelink.Player = ctx.guild.voice_client
         if not (await self.validate(ctx,player)):
             return
         id = int(ctx.guild.id)
         self.is_repeating_playlist[id] = not self.is_repeating_playlist[id]
         if self.is_repeating_playlist[id]:
-            await ctx.send(f"Now repeating the queue")
+            await ctx.response.send_message(f"Now repeating the queue")
         else:
-            await ctx.send(f"No longer repeating the queue")
+            await ctx.response.send_message(f"No longer repeating the queue")
 
-    @commands.command(
+    @app_commands.command(
         name="shuffle",
-        aliases=["shuf","sh"],
-        help=""
     )
-    async def shuffle_command(self, ctx: commands.Context):
-        player: wavelink.Player = ctx.voice_client
+    async def shuffle_command(self, ctx: discord.Interaction):
+        player: wavelink.Player = ctx.guild.voice_client
         if not (await self.validate(ctx,player)):
             return
         random.shuffle(player.queue._queue)
-        await ctx.send(f"Shuffled the queue")
+        await ctx.response.send_message(f"Shuffled the queue")
         
 
-    @commands.command(
+    @app_commands.command(
         name="volume",
-        aliases=['v'],
-        help=""
     )
-    async def volume_command(self, ctx: commands.Context, to=None):
-        player: wavelink.Player = ctx.voice_client
+    async def volume_command(self, ctx: discord.Interaction, to:int=None):
+        player: wavelink.Player = ctx.guild.voice_client
         if not (await self.validate(ctx,player)):
             return
-        try:
-            to = int(to)
-        except:
-            await ctx.send("Volume must be a whole number between 0 and 1000 (ex: 50)")
-            return 
+        # try:
+        #     to = int(to)
+        # except:
+        #     await ctx.response.send_message("Volume must be a whole number between 0 and 1000 (ex: 50)")
+        #     return 
         if to > 1000:
-            await ctx.send("Volume must be between 0 and 1000")
+            await ctx.response.send_message("Volume must be between 0 and 1000")
             return
-        elif to < 1:
-            await ctx.send("Volume must be between 0 and 1000")
+        elif to < 0:
+            await ctx.response.send_message("Volume must be between 0 and 1000")
             return
         elif to > 100:
             embed = discord.Embed(title=f"Warning: setting volume over 100% is not recommended. Please be careful!", color=Color.red())
-            await ctx.send(embed=embed)
+            await ctx.response.send_message(embed=embed)
         await player.set_volume(to)
-        await ctx.send(f"Set volume to {to}%")
+        await ctx.response.send_message(f"Set volume to {to}%")
     
-    @commands.command(
+    @app_commands.command(
         name="currently_playing",
-        aliases=['cu','current','cp'],
-        help=""
     )
-    async def currently_playing_command(self, ctx: commands.Context):
-        player: wavelink.Player = ctx.voice_client
+    async def currently_playing_command(self, ctx: discord.Interaction):
+        player: wavelink.Player = ctx.guild.voice_client
         if not (await self.validate(ctx,player)):
             return
         embed = self.nowPlaying(ctx, player.current)
-        await ctx.send(embed=embed)
+        await ctx.response.send_message(embed=embed)
 
-    @commands.command(
+    @app_commands.command(
         name="restart",
-        aliases=['res'],
-        help=""
     )
-    async def restart_command(self, ctx: commands.Context):
-        player: wavelink.Player = ctx.voice_client
+    async def restart_command(self, ctx: discord.Interaction):
+        player: wavelink.Player = ctx.guild.voice_client
         if not (await self.validate(ctx,player)):
             return
         await player.seek(0)
-        await ctx.send("Starting the song from the beginning")
+        await ctx.response.send_message("Starting the song from the beginning")
 
-    # @commands.command(
+    # @app_commands.command(
     #     name="speed",
     #     aliases=['f'],
     #     help=""
     # )
-    # async def timescale_command(self, ctx: commands.Context):
+    # async def timescale_command(self, ctx: discord.Interaction):
     #     try:
-    #         player: wavelink.Player = ctx.voice_client
+    #         player: wavelink.Player = ctx.guild.voice_client
     #         if not (await self.validate(ctx,player)):
     #             return
     #         # filter = wavelink.Filter(wavelink.k)
     #         await player.set_filter(wavelink.Filter(rotation=wavelink.Rotation(speed = 1.2)))
 
-    #         await ctx.send("SET FILTER")
+    #         await ctx.response.send_message("SET FILTER")
     #     except Exception as e:
     #         exc_type, exc_obj, exc_tb = sys.exc_info()
     #         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
