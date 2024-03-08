@@ -5,6 +5,7 @@ __pycache__
 application.yml
 logs
 Lavalink_old.jar
-Lavalink_old.jar
+Lavalink_older.jar
+Lavalink.jar
 .DS_STORE
 venv
