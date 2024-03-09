@@ -1,16 +1,17 @@
-import string
-import discord
-import wavelink
-from discord.ext import commands
-from discord import app_commands
-import sys
-import math
-from discord.ui import Select,View
-from discord import Color
-import validators
-import random
-import traceback
 import logging
+import math
+import random
+import string
+import sys
+import traceback
+
+import discord
+import validators
+import wavelink
+from discord import Color, app_commands
+from discord.ext import commands
+from discord.ui import Select, View
+
 
 class Music(commands.Cog):
     def __init__(self,bot: commands.Bot):
@@ -71,7 +72,7 @@ class Music(commands.Cog):
                 await join_context.channel.send(f"Realm Tunes left because there were no members remaining in ``{before.channel}``")
 
     @commands.Cog.listener()
-    async def on_wavelink_track_end(self, payload: wavelink.TrackEventPayload):
+    async def on_wavelink_track_end(self, payload: wavelink.TrackEndEventPayload):
         player = payload.player
         reason = payload.reason
         track = payload.track
@@ -97,6 +98,18 @@ class Music(commands.Cog):
         else:
             await player.stop()
     
+    # @commands.Cog.listener()
+    # async def on_wavelink_track_start(self, payload: wavelink.TrackStartEventPayload):
+    #     player = payload.player
+    #     if not player:
+    #         raise Exception("No player")
+        
+    #     original = payload.original
+    #     track = payload.track
+    #     id = int(player.guild.id)
+    #     ctx = self.join_context[id]
+    #     embed = self.nowPlaying(ctx,track)
+    
     async def cog_check(self,ctx):
         if isinstance(ctx.channel, discord.DMChannel):
             await ctx.response.send_message("Sorry, music commands are not available in DMs. Please join a voice channel in a server containing Realm Tunes to use music commands!")
@@ -105,7 +118,7 @@ class Music(commands.Cog):
     
     def nowPlaying(self,ctx,track):
         title = track.title
-        duration = self.convertDuration(track.duration)
+        duration = self.convertDuration(track.length)
         link = track.uri
         author = ctx.user
         avatar = author.display_avatar.url
@@ -115,15 +128,16 @@ class Music(commands.Cog):
             description = f'[{title}]({link}) ({duration})',
             colour = Color.green()
         )
-        if type(track) == wavelink.YouTubeTrack:
-            thumbnail = track.thumbnail
+        print("ARTWORK",track.artwork)
+        if track.artwork:
+            thumbnail = track.artwork
             embed.set_thumbnail(url=thumbnail)
         embed.set_footer(text=f'Song added by {str(author)}',icon_url=avatar)
         return embed
     
     def addedSongToQueue(self,ctx,track,qlen):
         title = track.title
-        duration = self.convertDuration(track.duration)
+        duration = self.convertDuration(track.length)
         link = track.uri
         author = ctx.user
         avatar = author.display_avatar.url
@@ -133,8 +147,8 @@ class Music(commands.Cog):
             description = f'[{title}]({link}) ({duration})',
             colour = Color.green()
         )
-        if type(track) == wavelink.YouTubeTrack:
-            thumbnail = track.thumbnail
+        if track.artwork:
+            thumbnail = track.artwork
             embed.set_thumbnail(url=thumbnail)
         embed.set_footer(text=f'Song added by {str(author)}',icon_url=avatar)
         return embed
@@ -202,53 +216,58 @@ class Music(commands.Cog):
         result = True
         return result
     async def chooseSong(self,ctx: discord.Interaction,query,is_playnow=False):
-        search_list = None
-        search_list = await wavelink.YouTubeTrack.search(query)
-        if not search_list:
-            await ctx.response.send_message(f"No results for search query: {query}\nPlease try a different search query")
-            return
-        #Soundcloud Disabled until I can find a fix for the 30 second cutoff
-        i=0
-        length = 10
-        if len(search_list) < 10:
-            length = len(search_list)
-        message=""
-        emoji_list = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"]
-        for track in search_list[:length]:
-            title = track.title
-            duration = self.convertDuration(track.duration)
-            link = track.uri
-            message += f"{emoji_list[i]} [{title}]({link}) ({duration})\n\n"
-            i+=1
-        embed = discord.Embed(
-            title = f"Youtube Search Results For: {query}",
-            description = message,
-            colour = Color.green()
-        )
-        select = Select(
-            placeholder="Choose a song",
-            min_values="1",
-            max_values="1",
-            options=self.buildResponse(length)
-        )
-        
-        async def SongChosen(interaction: discord.Interaction):
-            await interaction.response.defer()
-            song_number = int(select.values[0])
-            select.placeholder = f"Song {song_number} chosen"
-            select.disabled = True
-            new_view = View()
-            new_view.add_item(select)
-            await interaction.message.edit(embed=embed,view=new_view)
-            player: wavelink.Player = ctx.guild.voice_client
-            selection = search_list[song_number-1]
+        try:
+            search_list = None
+            search_list = await wavelink.Playable.search(query)
+            if not search_list:
+                await ctx.response.send_message(f"No results for search query: {query}\nPlease try a different search query")
+                return
+            #Soundcloud Disabled until I can find a fix for the 30 second cutoff
+            i=0
+            length = 10
+            if len(search_list) < 10:
+                length = len(search_list)
+            message=""
+            emoji_list = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"]
+            for track in search_list[:length]:
+                title = track.title
+                duration = self.convertDuration(track.length)
+                link = track.uri
+                message += f"{emoji_list[i]} [{title}]({link}) ({duration})\n\n"
+                i+=1
+            embed = discord.Embed(
+                title = f"Youtube Search Results For: {query}",
+                description = message,
+                colour = Color.green()
+            )
+            select = Select(
+                placeholder="Choose a song",
+                min_values="1",
+                max_values="1",
+                options=self.buildResponse(length)
+            )
             
-            await self.route(ctx,selection,player,is_playnow)
-        select.callback = SongChosen
-        view = View()
-        view.add_item(select)
-        msg = await ctx.response.send_message(embed=embed,view=view)
-        return 
+            async def SongChosen(interaction: discord.Interaction):
+                try:
+                    await interaction.response.defer()
+                    song_number = int(select.values[0])
+                    select.placeholder = f"Song {song_number} chosen"
+                    select.disabled = True
+                    new_view = View()
+                    new_view.add_item(select)
+                    await interaction.followup.send(embed=embed,view=new_view)
+                    player: wavelink.Player = ctx.guild.voice_client
+                    selection = search_list[song_number-1]
+                    await self.route(ctx,selection,player,is_playnow, is_followup=True)
+                except Exception as e:
+                    print(e)
+            select.callback = SongChosen
+            view = View()
+            view.add_item(select)
+            await ctx.response.send_message(embed=embed,view=view)
+            return 
+        except Exception as e:
+            print(e)
 
     async def validatePlay(self,ctx: discord.Interaction):
         if ctx.user.voice:
@@ -273,29 +292,35 @@ class Music(commands.Cog):
         if player == None:
             await ctx.response.send_message("Realm Tunes is not connected to any voice channel")
             return False
-        if not player.is_playing():
+        if not player.playing:
             await ctx.response.send_message("Nothing is playing right now")
             return False
         return True
     
-    async def playSong(self,ctx,search,player):
+    async def playSong(self,ctx,search,player,is_followup=False):
         track = await player.play(search)
         embed = self.nowPlaying(ctx,track)
-        await ctx.response.send_message(embed=embed)
+        if is_followup:
+            await ctx.followup.send(embed=embed)
+        else:
+            await ctx.response.send_message(embed=embed)
 
-    async def addToQueue(self,ctx,search,player,is_playlist=False):
+    async def addToQueue(self,ctx,search,player,is_playlist=False, is_followup=False):
         await player.queue.put_wait(search)
         len = player.queue.count
         if not is_playlist:
             embed = self.addedSongToQueue(ctx,search,len)
-            await ctx.response.send_message(embed=embed)
+            if is_followup:
+                await ctx.followup.send(embed=embed)
+            else:
+                await ctx.response.send_message(embed=embed)
 
     
-    async def route(self,ctx,track,player,is_playnow,is_playlist = False):
-        if (player.is_playing() or player.is_paused()) and not is_playnow:
-            await self.addToQueue(ctx,track,player,is_playlist)
+    async def route(self,ctx,track,player,is_playnow,is_playlist = False, is_followup = False):
+        if (player.playing or player.paused) and not is_playnow:
+            await self.addToQueue(ctx,track,player,is_playlist,is_followup=is_followup)
         else:
-            await self.playSong(ctx,track,player)
+            await self.playSong(ctx,track,player, is_followup=is_followup)
     
     async def omniPlayer(self,ctx: discord.Interaction,query,is_playnow):
         if len(query) == 0:
@@ -314,8 +339,8 @@ class Music(commands.Cog):
                 if is_playnow:
                     is_playnow = False
                 #PLAYLIST TECH
-                playlist = await wavelink.YouTubePlaylist.search(query)
-                thumbnail = playlist.tracks[0].thumbnail
+                playlist = await wavelink.Playable.search(query)
+                thumbnail = playlist.artwork
                 embed = self.addedPlaylistToQueue(ctx,playlist,query,thumbnail)
                 await ctx.response.send_message(embed=embed)
                 for track in playlist.tracks:
@@ -323,15 +348,16 @@ class Music(commands.Cog):
 
             else:
                 track = None
-                try:
-                    track = await wavelink.YouTubeTrack.search(query)
-                except:
-                    track = await wavelink.node.get_tracks(query, cls=wavelink.Track)
+                # try:
+                #     track = await wavelink.YouTubeTrack.search(query)
+                # except:
+                #     track = await wavelink.node.get_tracks(query, cls=wavelink.Track)
+                track = await wavelink.Playable.search(query)
                 if not track:
                     await ctx.response.send_message(f"No results for search query: {query}\nPlease try a different search query")
                     return
                 track = track[0]
-                await self.route(ctx,track,player,is_playnow)
+                await self.route(ctx,track,player,is_playnow,True)
             return
 
     @app_commands.command(
@@ -412,7 +438,7 @@ class Music(commands.Cog):
 
         if not (await self.validate(ctx,player)):
             return
-        if player.is_paused():
+        if player.paused:
             await player.resume()
             await ctx.response.send_message("Playback resumed")
         else:

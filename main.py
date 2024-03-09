@@ -1,17 +1,18 @@
-import discord
-import os 
-from dotenv import load_dotenv
 import asyncio
 import logging
+import os
 import sys
 import time
+
+import discord
+import wavelink
+from discord.ext import commands
+from dotenv import load_dotenv
+
+from cogs.exceptions import ExceptionHandler
 from cogs.help import Help
 from cogs.music import Music
 from cogs.utils import Utils
-from cogs.exceptions import ExceptionHandler
-import wavelink
-
-from discord.ext import commands
 
 load_dotenv()
 password = str(os.getenv("BOT_KEY"))
@@ -27,6 +28,7 @@ class Bot(commands.Bot):
         intents.message_content = True
         case_insensitive = True
         activity = discord.Activity(type=discord.ActivityType.listening, name="/help")
+        discord.utils.setup_logging(level=logging.INFO)
         super().__init__(command_prefix='-', intents=intents,case_insensitive=case_insensitive,activity=activity)
 
     async def on_ready(self) -> None:
@@ -34,7 +36,7 @@ class Bot(commands.Bot):
 
     async def setup_hook(self) -> None:
         node: wavelink.Node = wavelink.Node(uri=server_host, password=server_pass)
-        await wavelink.NodePool.connect(client=self, nodes=[node])
+        await wavelink.Pool.connect(client=self, nodes=[node])
 
     async def on_wavelink_node_ready(self, node: wavelink.Node):
         """Event fired when a node has finished connecting."""
