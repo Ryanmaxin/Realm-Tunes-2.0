@@ -40,7 +40,7 @@ class Bot(commands.Bot):
 
     async def on_wavelink_node_ready(self, node: wavelink.Node):
         """Event fired when a node has finished connecting."""
-        print(f'Node: <{node.identifier}> is ready!')
+        print(f'Node is ready!')
 
 async def main():
     bot = Bot()

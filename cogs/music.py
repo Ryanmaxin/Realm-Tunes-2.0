@@ -59,17 +59,22 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
-        id = int(member.guild.id)
-        player: wavelink.Player = member.guild.voice_client
-        if not member.bot and before.channel != None and after.channel != before.channel:
-            remaining_channel_members = before.channel.members
-            if len(remaining_channel_members) == 1 and remaining_channel_members[0].bot and player.is_connected():
-                await player.disconnect()
-                join_context = self.join_context[id]
-                self.is_looping[id] = False
-                self.is_repeating_playlist[id] = False
-                self.previous_song[id] = None
-                await join_context.channel.send(f"Realm Tunes left because there were no members remaining in ``{before.channel}``")
+        try:
+            id = int(member.guild.id)
+            player: wavelink.Player = member.guild.voice_client
+            if not member.bot and before.channel != None and after.channel != before.channel:
+                remaining_channel_members = before.channel.members
+                if len(remaining_channel_members) == 1 and remaining_channel_members[0].bot and player.connected:
+                    await player.disconnect()
+                    join_context = self.join_context[id]
+                    self.is_looping[id] = False
+                    self.is_repeating_playlist[id] = False
+                    self.previous_song[id] = None
+                    await join_context.channel.send(f"Realm Tunes left because there were no members remaining in ``{before.channel}``")
+        except Exception as e:
+            print(e)
+
+
 
     @commands.Cog.listener()
     async def on_wavelink_track_end(self, payload: wavelink.TrackEndEventPayload):
@@ -98,17 +103,58 @@ class Music(commands.Cog):
         else:
             await player.stop()
     
-    # @commands.Cog.listener()
-    # async def on_wavelink_track_start(self, payload: wavelink.TrackStartEventPayload):
-    #     player = payload.player
-    #     if not player:
-    #         raise Exception("No player")
+    @commands.Cog.listener()
+    async def on_wavelink_track_start(self, payload: wavelink.TrackStartEventPayload):
+        player = payload.player
+        if not player:
+            raise Exception("No player")
         
-    #     original = payload.original
-    #     track = payload.track
-    #     id = int(player.guild.id)
-    #     ctx = self.join_context[id]
-    #     embed = self.nowPlaying(ctx,track)
+        track = payload.track
+        title = track.title
+        duration = self.convertDuration(track.length)
+        link = track.uri
+        author = track.author
+        # avatar = author.display_avatar.url
+
+        embed = discord.Embed(
+            title = "Now Playing",
+            description = f'[{title}]({link}) ({duration})',
+            colour = Color.green()
+        )
+
+        if track.artwork:
+            embed.set_thumbnail(url=track.artwork)
+
+        if track.album.name:
+            embed.add_field(name="Album", value=track.album.name)
+
+        embed.set_footer(text=f'Song added by {str(author)}')
+
+        await player.home.send(embed=embed)
+
+
+        # id = int(player.guild.id)
+        # ctx = self.join_context[id]
+        # embed = self.nowPlaying(ctx,track)
+
+        # #Now playing 
+        # title = track.title
+        # duration = self.convertDuration(track.length)
+        # link = track.uri
+        # author = ctx.user
+        # avatar = author.display_avatar.url
+
+        # embed = discord.Embed(
+        #     title = "Now Playing",
+        #     description = f'[{title}]({link}) ({duration})',
+        #     colour = Color.green()
+        # )
+        # print("ARTWORK",track.artwork)
+        # if track.artwork:
+        #     thumbnail = track.artwork
+        #     embed.set_thumbnail(url=thumbnail)
+        
+        # return embed
     
     async def cog_check(self,ctx):
         if isinstance(ctx.channel, discord.DMChannel):
@@ -218,7 +264,7 @@ class Music(commands.Cog):
     async def chooseSong(self,ctx: discord.Interaction,query,is_playnow=False):
         try:
             search_list = None
-            search_list = await wavelink.Playable.search(query)
+            search_list = await wavelink.Playable.search(query, source=wavelink.TrackSource.YouTube)
             if not search_list:
                 await ctx.response.send_message(f"No results for search query: {query}\nPlease try a different search query")
                 return
@@ -328,13 +374,19 @@ class Music(commands.Cog):
             return
         if not await self.validatePlay(ctx):
             return
+        player: wavelink.Player = ctx.guild.voice_client
+        if not hasattr(player, "home"):
+            player.home = ctx.channel
+        elif player.home != ctx.channel:
+            await ctx.send(f"You can only play songs in {player.home.mention}, as the player has already started there.")
+            return
         if not validators.url(query):
             #Play will occur later, this function only creates an embed menu to select the song
             await self.chooseSong(ctx, query,is_playnow)
             return
         else:
             #When a url is given, play the song immediately
-            player: wavelink.Player = ctx.guild.voice_client
+            # player: wavelink.Player = ctx.guild.voice_client
             if "list=P" in query:
                 if is_playnow:
                     is_playnow = False
