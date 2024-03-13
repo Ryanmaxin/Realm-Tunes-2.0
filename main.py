@@ -38,9 +38,9 @@ class Bot(commands.Bot):
         node: wavelink.Node = wavelink.Node(uri=server_host, password=server_pass)
         await wavelink.Pool.connect(client=self, nodes=[node])
 
-    async def on_wavelink_node_ready(self, node: wavelink.Node):
+    async def on_wavelink_node_ready(self, payload: wavelink.NodeReadyEventPayload):
         """Event fired when a node has finished connecting."""
-        print(f'Node is ready!')
+        print(f'Node {payload.node}is ready!')
 
 async def main():
     bot = Bot()
