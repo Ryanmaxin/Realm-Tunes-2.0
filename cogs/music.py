@@ -609,8 +609,6 @@ class Music(commands.Cog):
         else:
             chosen = 0
         player: wavelink.Player = ctx.guild.voice_client
-        if not player:
-            return
         if not (await self.validate(ctx,player)):
             return
         
@@ -641,8 +639,6 @@ class Music(commands.Cog):
     @commands.guild_only()
     async def distortion_command(self, ctx: discord.Interaction) -> None:
         player: wavelink.Player = ctx.guild.voice_client
-        if not player:
-            return
         if not (await self.validate(ctx,player)):
             return
         
@@ -670,8 +666,6 @@ class Music(commands.Cog):
     @commands.guild_only()
     async def bass_boost_command(self, ctx: discord.Interaction) -> None:
         player: wavelink.Player = ctx.guild.voice_client
-        if not player:
-            return
         if not (await self.validate(ctx,player)):
             return
         
@@ -715,8 +709,6 @@ class Music(commands.Cog):
     @commands.guild_only()
     async def eightd_audio_command(self, ctx: discord.Interaction) -> None:
         player: wavelink.Player = ctx.guild.voice_client
-        if not player:
-            return
         if not (await self.validate(ctx,player)):
             return
         
@@ -738,8 +730,6 @@ class Music(commands.Cog):
     @commands.guild_only()
     async def reset_filters(self, ctx: discord.Interaction) -> None:
         player: wavelink.Player = ctx.guild.voice_client
-        if not player:
-            return
         if not (await self.validate(ctx,player)):
             return
         
@@ -758,8 +748,8 @@ class Music(commands.Cog):
     @commands.guild_only()
     async def now_playing_command(self, ctx: discord.Interaction):
         player: wavelink.Player = ctx.guild.voice_client
-        if not player:
-            raise Exception("No player")
+        if not (await self.validate(ctx,player)):
+            return
         
         track = player.current
         if not track:
