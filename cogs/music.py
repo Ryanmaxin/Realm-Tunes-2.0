@@ -1,9 +1,4 @@
-import logging
 import math
-import random
-import string
-import sys
-import traceback
 
 import discord
 import validators
@@ -12,7 +7,13 @@ from discord import Color, app_commands
 from discord.ext import commands
 from discord.ui import Select, View
 
+# from cogs.button import ButtonView
 from helpers import sendDM
+
+# from discord_slash.model import ButtonStyle
+# from discord_slash.utils.manage_components import (create_actionrow,
+#                                                    create_button)
+
 
 
 class Music(commands.Cog):
@@ -21,8 +22,6 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        # await self.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="-help"))
-        #Make each server an id to a dictionary to distinguish them from one another
         pass
 
 
@@ -42,9 +41,9 @@ class Music(commands.Cog):
         player = payload.player
         reason = payload.reason
         track = payload.track
-        if str(reason) == "REPLACED":
+        if str(reason) == "replaced":
             return
-        if not str(reason) == "finished" and not str(reason) == "stopped":
+        if str(reason) != "finished" and str(reason) != "stopped":
             embed = discord.Embed(title=f"Something went wrong while playing: {track.title}", color=Color.red())
             await player.home.send(embed=embed)
             await sendDM(self,reason,f"Something went wrong while playing: {track.title}")
@@ -60,7 +59,6 @@ class Music(commands.Cog):
     
     @commands.Cog.listener()
     async def on_wavelink_track_start(self, payload: wavelink.TrackStartEventPayload):
-        print("HELLO")
         player = payload.player
         if not player:
             raise Exception("No player")
@@ -106,12 +104,12 @@ class Music(commands.Cog):
         embed = discord.Embed(
             title = f"Added to Queue ({qlen})",
             description = f'[{title}]({link}) ({duration})',
-            colour = Color.green()
+            colour = Color.blurple()
         )
         if track.artwork:
             thumbnail = track.artwork
             embed.set_thumbnail(url=thumbnail)
-        embed.set_footer(text=f'Song added by {str(author)}',icon_url=avatar)
+        embed.set_footer(text=f'Song added by {author.name}',icon_url=avatar)
         return embed
 
     def addedPlaylistToQueue(self,ctx,playlist,url,img):
@@ -122,11 +120,11 @@ class Music(commands.Cog):
         embed = discord.Embed(
             title = f"Playlist Added to Queue",
             description = f'[{title}]({url}) ({length} songs)',
-            colour = Color.green()
+            colour = Color.blurple()
         )
         thumbnail = img
         embed.set_thumbnail(url=thumbnail)
-        embed.set_footer(text=f'Playlist added by {str(author)}',icon_url=avatar)
+        embed.set_footer(text=f'Playlist added by {author.name}',icon_url=avatar)
         return embed
 
     def convertDuration(self, duration):
@@ -169,58 +167,72 @@ class Music(commands.Cog):
         result = True
         return result
     async def chooseSong(self,ctx: discord.Interaction,query,is_playnow=False):
-        try:
-            search_list = None
-            search_list = await wavelink.Playable.search(query, source=wavelink.TrackSource.YouTube)
-            if not search_list:
-                await ctx.response.send_message(f"No results for search query: {query}\nPlease try a different search query")
-                return
-            #Soundcloud Disabled until I can find a fix for the 30 second cutoff
-            i=0
-            length = 10
-            if len(search_list) < 10:
-                length = len(search_list)
-            message=""
-            emoji_list = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"]
-            for track in search_list[:length]:
-                title = track.title
-                duration = self.convertDuration(track.length)
-                link = track.uri
-                message += f"{emoji_list[i]} [{title}]({link}) ({duration})\n\n"
-                i+=1
-            embed = discord.Embed(
-                title = f"Youtube Search Results For: {query}",
-                description = message,
-                colour = Color.green()
-            )
-            select = Select(
-                placeholder="Choose a song",
-                min_values="1",
-                max_values="1",
-                options=self.buildResponse(length)
-            )
+        search_list = None
+        search_list = await wavelink.Playable.search(query, source=wavelink.TrackSource.YouTubeMusic)
+        if not search_list:
+            await ctx.response.send_message(f"No results for search query: {query}\nPlease try a different search query")
+            return
+        #Soundcloud Disabled until I can find a fix for the 30 second cutoff
+        i=0
+        length = 10
+        if len(search_list) < 10:
+            length = len(search_list)
+        message=""
+        emoji_list = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"]
+        for track in search_list[:length]:
+            title = track.title
+            duration = self.convertDuration(track.length)
+            link = track.uri
+            message += f"{emoji_list[i]} [{title}]({link}) ({duration})\n\n"
+            i+=1
+        embed = discord.Embed(
+            title = f"Youtube Search Results For: {query}",
+            description = message,
+            colour = Color.green()
+        )
+        select = Select(
+            placeholder="Choose a song",
+            min_values="1",
+            max_values="1",
+            options=self.buildResponse(length)
+        )
+
+        # buttons = [
+        #     create_button(
+        #         style=ButtonStyle.green,
+        #         label="A Green Button"
+        #     ),
+        #   ]
+
+        # action_row = create_actionrow(*buttons)
+        
+        async def songChosen(interaction: discord.Interaction):
+            await interaction.response.defer()
+            song_number = int(select.values[0])
+            select.placeholder = f"Song {song_number} chosen"
+            select.disabled = True
+            new_view = View()
+            new_view.add_item(select)
+            await interaction.message.edit(embed=embed,view=new_view)
+            player: wavelink.Player = ctx.guild.voice_client
+            selection = search_list[song_number-1]
+
+            selection.requester = ctx.user
+            await player.queue.put_wait(selection)
+            len = player.queue.count
+            queue_embed = self.addedSongToQueue(ctx,selection,len)
+            await interaction.followup.send(embed=queue_embed)
+
+            if not (player.playing or player.paused) or is_playnow:
+                # Play now since we aren't playing anything...
+                await player.play(player.queue.get())
             
-            async def SongChosen(interaction: discord.Interaction):
-                try:
-                    await interaction.response.defer()
-                    song_number = int(select.values[0])
-                    select.placeholder = f"Song {song_number} chosen"
-                    select.disabled = True
-                    new_view = View()
-                    new_view.add_item(select)
-                    await interaction.followup.send(embed=embed,view=new_view)
-                    player: wavelink.Player = ctx.guild.voice_client
-                    selection = search_list[song_number-1]
-                    await self.route(ctx,selection,player,is_playnow)
-                except Exception as e:
-                    print(e)
-            select.callback = SongChosen
-            view = View()
-            view.add_item(select)
-            await ctx.response.send_message(embed=embed,view=view)
-            return 
-        except Exception as e:
-            print(e)
+            # await self.route(ctx,selection,player,is_playnow)
+        select.callback = songChosen
+        view = View()
+        view.add_item(select)
+        await ctx.response.send_message(embed=embed,view=view)
+        return 
 
     async def validatePlay(self,ctx: discord.Interaction):
         if ctx.user.voice:
@@ -261,9 +273,11 @@ class Music(commands.Cog):
         if not await self.validatePlay(ctx):
             return
         player: wavelink.Player = ctx.guild.voice_client
+            
         if not validators.url(query):
             #Play will occur later, this function only creates an embed menu to select the song
             await self.chooseSong(ctx, query,is_playnow)
+            return
         else:
             #When a url is given, play the song immediately
             # player: wavelink.Player = ctx.guild.voice_client
@@ -283,13 +297,13 @@ class Music(commands.Cog):
                 track.requester = ctx.user
                 await player.queue.put_wait(track)
                 len = player.queue.count
-                if player.playing or player.paused:
-                    embed = self.addedSongToQueue(ctx,track,len)
-                    await ctx.response.send_message(embed=embed)
-                else:
-                    # await ctx.response.defer(ephemeral=True)
-                    await ctx.response.send_message("Success",delete_after=2)
-                    # await ctx.
+                embed = self.addedSongToQueue(ctx,track,len)
+                await ctx.response.send_message(embed=embed)
+                # if player.playing or player.paused:
+                #     embed = self.addedSongToQueue(ctx,track,len)
+                #     await ctx.response.send_message(embed=embed)
+                # else:
+                #     await ctx.response.send_message("Success",ephemeral=True)
 
         if not (player.playing or player.paused) or is_playnow:
             # Play now since we aren't playing anything...
@@ -352,8 +366,9 @@ class Music(commands.Cog):
         if not (await self.validate(ctx,player)):
             return
 
-        await player.stop()
+        player.queue.mode = wavelink.QueueMode.normal
         player.queue.clear()
+        await player.stop()
         await ctx.response.send_message("Playback stopped")
     
     @app_commands.command(
@@ -397,8 +412,9 @@ class Music(commands.Cog):
         player: wavelink.Player = ctx.guild.voice_client
         if not (await self.validate(ctx,player)):
             return
+        current_song = player.current.title
         await player.skip()
-        await ctx.response.send_message(f"Skipped track: {player.current.title}")
+        await ctx.response.send_message(f"Skipped track: {current_song}")
 
     @app_commands.command(
         name="queue",
@@ -480,27 +496,34 @@ class Music(commands.Cog):
     )
     @app_commands.describe(priority='Whether to play the command immediately or just add it to the queue' )
     @app_commands.choices(priority=[
-        discord.app_commands.Choice(name='now', value=1),
-        discord.app_commands.Choice(name='queue', value=0)])
+        discord.app_commands.Choice(name='now', value=1)])
     @commands.guild_only()
     async def previous_command(self, ctx: discord.Interaction, priority:discord.app_commands.Choice[int]=0):
         if not (await self.validatePlay(ctx)):
             return
         player: wavelink.Player = ctx.guild.voice_client
         history = player.queue.history
+        previous = None
         try:
             previous = history.get()
         except wavelink.QueueEmpty:
             await ctx.response.send_message(f"No previous song found")
             return
-        await history.delete(0)
         
         
         is_playingnow = False
         if priority:
             is_playingnow = True
-        await self.route(ctx,previous,player,is_playingnow)
-        
+        previous.requester = ctx.user
+        await player.queue.put_wait(previous)
+        len = player.queue.count
+        queue_embed = self.addedSongToQueue(ctx,previous,len)
+        await ctx.response.send_message(embed=queue_embed)
+
+        if not (player.playing or player.paused) or is_playingnow:
+            # Play now since we aren't playing anything...
+            await player.play(player.queue.get())
+    
         
 
     @app_commands.command(
@@ -568,51 +591,38 @@ class Music(commands.Cog):
         await player.seek(0)
         await ctx.response.send_message("Starting the song from the beginning")
 
-    # @app_commands.command(
-    #     name="speed",
-    #     aliases=['f'],
-    #     help=""
-    # )
-    # async def timescale_command(self, ctx: discord.Interaction):
-    #     try:
-    #         player: wavelink.Player = ctx.guild.voice_client
-    #         if not (await self.validate(ctx,player)):
-    #             return
-    #         # filter = wavelink.Filter(wavelink.k)
-    #         await player.set_filter(wavelink.Filter(rotation=wavelink.Rotation(speed = 1.2)))
-
-    #         await ctx.response.send_message("SET FILTER")
-    #     except Exception as e:
-    #         exc_type, exc_obj, exc_tb = sys.exc_info()
-    #         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    #         print(exc_type, fname, exc_tb.tb_lineno,e)
-        
     @app_commands.command(
-    name="help2",
-    description="Displays list of available commands"
+        name="modify",
+        description="Set the current song to nightcore, slowed, or regular"
     )
-    async def help2_command(self,ctx:discord.Interaction):
-            author = ctx.user
-            embed = discord.Embed(
-                title = "Realm Tunes Command Guide",
-                colour = discord.Colour.yellow()
-            )
-            embed.add_field(name='Join', value= 'Realm Tunes joins your current vc if you are in one.', inline=False)
-            embed.add_field(name='Leave', value= 'Realm Tunes leaves his current vc.', inline=False)
-            embed.add_field(name='Play', value= 'Realm Tunes will immediately queue up the query if it is a url/playlist, otherwise it will search for the query on YouTube and create a menu where you can choose a song.', inline=False)
-            embed.add_field(name='Play Now', value= 'Identical to Play, except the desired song will be play immediately even if there is another song playing.', inline=False)
-            embed.add_field(name='Clear', value='Clears the queue and ends the current song.', inline=False)
-            embed.add_field(name='Pause', value= 'Switches between pausing and unpausing the music.', inline=False)
-            embed.add_field(name='Skip', value= 'Skips the current song.', inline=False)
-            embed.add_field(name='Queue', value= 'Shows the current queue. Add a number to select specific page (when more then 10 songs)', inline=False)
-            embed.add_field(name='Loop', value= 'Toggles on or off looping. looping repeats the current song after it ends.', inline=False)
-            embed.add_field(name='Seek', value= 'Begins playing at the specified number of seconds into the song.', inline=False)
-            embed.add_field(name='Previous', value= 'Puts the previously played song into the queue. You can add "now" to the end to play the song now.', inline=False)
-            embed.add_field(name='Repeat', value= 'Toggles on or off repeating the current queue', inline=False)
-            embed.add_field(name='Shuffle', value= 'Puts the current queue in a random order.', inline=False)
-            embed.add_field(name='Volume', value= 'Sets the volume of Realm Tunes to the specified amount.', inline=False)
-            embed.add_field(name='Current', value= 'Shows the song that is currently playing', inline=False)
-            embed.add_field(name='Restart', value= 'Begins playing the current song from the beginning', inline=False)
+    @app_commands.choices(modifyt=[
+        discord.app_commands.Choice(name='slowed', value=2),
+        discord.app_commands.Choice(name='nightcore', value=1),
+        discord.app_commands.Choice(name='regular', value=0)])
+    @commands.guild_only()
+    async def modify_command(self, ctx: discord.Interaction, modifyt:discord.app_commands.Choice[int]=0) -> None:
+        if modifyt == None:
+            modifyt = 0
+        player: wavelink.Player = ctx.guild.voice_client
+        if not player:
+            return
+        if not (await self.validate(ctx,player)):
+            return
+        
+        filters: wavelink.Filters = wavelink.Filters()
+        await player.set_filters(filters)
 
-            await author.response.send_message(embed=embed)
+        if modifyt.value == 2:
+            filters.timescale.set(pitch=0.85, speed=0.85, rate=0.85)
+        elif modifyt.value == 1:
+            filters.timescale.set(pitch=1.2, speed=1.2, rate=1)
+
+        await player.set_filters(filters)
+
+        if modifyt.value == 0:
+            await ctx.response.send_message("Set to regular... This may take a second")
+        if modifyt.value == 1:
+            await ctx.response.send_message("Set to nightcore... This may take a second")
+        if modifyt.value == 2:
+            await ctx.response.send_message("Set to slowed... This may take a second")
     

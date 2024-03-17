@@ -20,20 +20,20 @@ class ExceptionHandler(commands.Cog):
     @commands.Cog.listener("on_app_command_error")
     async def get_app_command_error(self, ctx: discord.Interaction, error: discord.app_commands.AppCommandError):
         if isinstance(error, commands.CommandNotFound):
-            await ctx.followup.send("That command does not exist. Use -help for list of all available commands")
+            await ctx.response.send_message("That command does not exist. Use -help for list of all available commands")
             return
         else:
             command_name = ctx.command.name
 
             embed = discord.Embed(title=f"Something went wrong with {command_name}", color=discord.Color.red())
-            await ctx.followup.send(embed=embed)
+            await ctx.response.send_message(embed=embed)
 
             error_type = type(error)
             error_traceback = error.__traceback__
 
-            # print(command_name,error)
-            # print('Ignoring exception in command {}:'.format(ctx.command), file=sys.stderr)
-            # traceback.print_exception(error_type, error, error_traceback, file=sys.stderr)
+            print(command_name,error)
+            print('Ignoring exception in command {}:'.format(ctx.command), file=sys.stderr)
+            traceback.print_exception(error_type, error, error_traceback, file=sys.stderr)
 
             exc_info = (error_type, error, error_traceback)
             logger = logging.getLogger()
