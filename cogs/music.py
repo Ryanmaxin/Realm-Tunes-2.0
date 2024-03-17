@@ -81,8 +81,8 @@ class Music(commands.Cog):
         if track.artwork:
             embed.set_thumbnail(url=track.artwork)
 
-        if track.album.name:
-            embed.add_field(name="Album", value=track.album.name)
+        # if track.album.name:
+        #     embed.add_field(name="Album", value=track.album.name)
 
         embed.set_footer(text=f'Song added by {str(author)}',icon_url=avatar)
 
@@ -168,7 +168,7 @@ class Music(commands.Cog):
         return result
     async def chooseSong(self,ctx: discord.Interaction,query,is_playnow=False):
         search_list = None
-        search_list = await wavelink.Playable.search(query, source=wavelink.TrackSource.YouTubeMusic)
+        search_list = await wavelink.Playable.search(query, source=wavelink.TrackSource.YouTube)
         if not search_list:
             await ctx.response.send_message(f"No results for search query: {query}\nPlease try a different search query")
             return
@@ -575,7 +575,7 @@ class Music(commands.Cog):
             return
         elif percent > 100:
             embed = discord.Embed(title=f"Warning: setting volume over 100% is not recommended. Please be careful!", color=Color.red())
-            await ctx.response.send_message(embed=embed)
+            await ctx.followup.send(embed=embed)
         await player.set_volume(percent)
         await ctx.response.send_message(f"Set volume to {percent}%")
 
@@ -592,37 +592,207 @@ class Music(commands.Cog):
         await ctx.response.send_message("Starting the song from the beginning")
 
     @app_commands.command(
-        name="modify",
+        name="timescale",
         description="Set the current song to nightcore, slowed, or regular"
     )
-    @app_commands.choices(modifyt=[
+    @app_commands.choices(option=[
+        discord.app_commands.Choice(name='custom', value=3),
         discord.app_commands.Choice(name='slowed', value=2),
         discord.app_commands.Choice(name='nightcore', value=1),
         discord.app_commands.Choice(name='regular', value=0)])
     @commands.guild_only()
-    async def modify_command(self, ctx: discord.Interaction, modifyt:discord.app_commands.Choice[int]=0) -> None:
-        if modifyt == None:
-            modifyt = 0
+    async def timescale_command(self, ctx: discord.Interaction, option:discord.app_commands.Choice[int], 
+                             pitch: float = 1.0, speed: float=1.0,rate: float=1.0) -> None:
+        chosen = None
+        if option.value:
+            chosen = option.value
+        else:
+            chosen = 0
         player: wavelink.Player = ctx.guild.voice_client
         if not player:
             return
         if not (await self.validate(ctx,player)):
             return
         
-        filters: wavelink.Filters = wavelink.Filters()
-        await player.set_filters(filters)
+        filters: wavelink.Filters = player.filters
 
-        if modifyt.value == 2:
-            filters.timescale.set(pitch=0.85, speed=0.85, rate=0.85)
-        elif modifyt.value == 1:
+        if chosen == 3:
+            filters.timescale.set(pitch=pitch, speed=speed, rate=rate)
+        elif chosen == 2:
+            filters.timescale.set(pitch=0.85, speed=0.85, rate=1)
+        elif chosen == 1:
             filters.timescale.set(pitch=1.2, speed=1.2, rate=1)
 
         await player.set_filters(filters)
 
-        if modifyt.value == 0:
-            await ctx.response.send_message("Set to regular... This may take a second")
-        if modifyt.value == 1:
-            await ctx.response.send_message("Set to nightcore... This may take a second")
-        if modifyt.value == 2:
-            await ctx.response.send_message("Set to slowed... This may take a second")
+        if chosen == 0:
+            await ctx.response.send_message("Set to regular... This may take a couple seconds")
+        if chosen == 1:
+            await ctx.response.send_message("Set to nightcore... This may take a couple seconds")
+        if chosen == 2:
+            await ctx.response.send_message("Set to slowed... This may take a couple seconds")
+        if chosen == 3:
+            await ctx.response.send_message("Set to custom timescale... This may take a couple seconds")
+
+    @app_commands.command(
+        name="distortion",
+        description="Distort the current song"
+    )
+    @commands.guild_only()
+    async def distortion_command(self, ctx: discord.Interaction) -> None:
+        player: wavelink.Player = ctx.guild.voice_client
+        if not player:
+            return
+        if not (await self.validate(ctx,player)):
+            return
+        
+        filters: wavelink.Filters = player.filters
+
+        filters.distortion.set(
+            sin_offset=0.5,    # Adjusting sin offset to add some cool effects
+            sin_scale=1.2,     # Increasing sin scale for a more pronounced effect
+            cos_offset=0.3,    # Fine-tuning cos offset for additional coolness
+            cos_scale=1.5,     # Increasing cos scale for a stronger effect
+            tan_offset=0.2,    # Adding a slight tan offset for variety
+            tan_scale=1.1,     # Adjusting tan scale for a nuanced effect
+            offset=0.0,        # Keeping offset at default (optional)
+            scale=1.0          # Keeping scale at default (optional)
+        )
+
+        await player.set_filters(filters)
+
+        await ctx.response.send_message("Added distortion... This may take a couple of seconds")
+
+    @app_commands.command(
+        name="instrumental",
+        description="Makes the current song instrumental"
+    )
+    @commands.guild_only()
+    async def instrumental_command(self, ctx: discord.Interaction) -> None:
+        player: wavelink.Player = ctx.guild.voice_client
+        if not player:
+            return
+        if not (await self.validate(ctx,player)):
+            return
+        
+        filters: wavelink.Filters = player.filters
+
+        filters.karaoke.set(
+            level=1.0,          # Setting the level to maximum (1.0) for full vocal removal effect
+            mono_level=1.0     # Setting mono_level to maximum (1.0) for full mono effect, which can help in removing center-panned vocals
+            # filter_band=1000.0, # Setting filter_band to a value that targets vocal frequencies (adjust as needed)
+            # filter_width=500.0  # Setting filter_width to a moderate value to encompass a range of vocal frequencies
+        )      # Keeping scale at default (optional)
+
+        await player.set_filters(filters)
+
+        await ctx.response.send_message("Removing vocals... This may take a couple of seconds")
+
+    @app_commands.command(
+        name="bass_boost",
+        description="Boosts the bass of the current audio"
+    )
+    @commands.guild_only()
+    async def bass_boost_command(self, ctx: discord.Interaction) -> None:
+        player: wavelink.Player = ctx.guild.voice_client
+        if not player:
+            return
+        if not (await self.validate(ctx,player)):
+            return
+        
+        filters: wavelink.Filters = player.filters
+
+        bands = [
+            {"band": 0, "gain": 0.2}, {"band": 1, "gain": 0.15}, {"band": 2, "gain": 0.1},
+            {"band": 3, "gain": 0.05}, {"band": 4, "gain": 0.0}, {"band": 5, "gain": -0.05},
+            {"band": 6, "gain": -0.1}, {"band": 7, "gain": -0.1}, {"band": 8, "gain": -0.1},
+            {"band": 9, "gain": -0.1}, {"band": 10, "gain": -0.1}, {"band": 11, "gain": -0.1},
+            {"band": 12, "gain": -0.1}, {"band": 13, "gain": -0.1}, {"band": 14, "gain": -0.1}
+        ]
+
+        filters.equalizer.set(bands=bands)   
+
+        await player.set_filters(filters)
+
+        await ctx.response.send_message("Boosting bass... This may take a couple of seconds")
+
+    @app_commands.command(
+        name="eightd_audio",
+        description="Makes the audio sound '8D'"
+    )
+    @commands.guild_only()
+    async def eightd_audio_command(self, ctx: discord.Interaction) -> None:
+        player: wavelink.Player = ctx.guild.voice_client
+        if not player:
+            return
+        if not (await self.validate(ctx,player)):
+            return
+        
+        filters: wavelink.Filters = player.filters
+
+
+        filters.rotation.set(
+            rotation_hz=0.2
+        )      
+
+        await player.set_filters(filters)
+
+        await ctx.response.send_message("Adding rotation... This may take a couple of seconds")
+
+    @app_commands.command(
+        name="reset_filters",
+        description="Reset all filters so that the song sounds normal again"
+    )
+    @commands.guild_only()
+    async def reset_filters(self, ctx: discord.Interaction) -> None:
+        player: wavelink.Player = ctx.guild.voice_client
+        if not player:
+            return
+        if not (await self.validate(ctx,player)):
+            return
+        
+        filters: wavelink.Filters = player.filters
+
+        filters.reset()
+
+        await player.set_filters(filters)
+
+        await ctx.response.send_message("Resetting filters... This may take a couple of seconds")
+
+    @app_commands.command(
+        name="now_playing",
+        description="Shows the currently playing song"
+    )
+    @commands.guild_only()
+    async def now_playing_command(self, ctx: discord.Interaction):
+        player: wavelink.Player = ctx.guild.voice_client
+        if not player:
+            raise Exception("No player")
+        
+        track = player.current
+        if not track:
+            ctx.response.send_message("No song is currently playing")
+        title = track.title
+        duration = self.convertDuration(track.length)
+        link = track.uri
+
+        user: discord.User | discord.Member = track.requester
+        author = user.name
+        avatar = user.display_avatar.url
+
+        embed = discord.Embed(
+            title = "Now Playing",
+            description = f'[{title}]({link}) ({duration})',
+            colour = Color.green()
+        )
+
+        if track.artwork:
+            embed.set_thumbnail(url=track.artwork)
+
+        if track.album.name:
+            embed.add_field(name="Album", value=track.album.name)
+
+        embed.set_footer(text=f'Song added by {str(author)}',icon_url=avatar)
+
+        await player.home.send(embed=embed)
     

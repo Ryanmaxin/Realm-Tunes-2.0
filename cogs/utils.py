@@ -1,8 +1,8 @@
 from typing import Literal, Optional
-from discord.ext import commands
-from discord import app_commands
-from discord.ext.commands import Greedy, Context # or a subclass of yours
 
+from discord import app_commands
+from discord.ext import commands
+from discord.ext.commands import Context, Greedy  # or a subclass of yours
 
 
 class Utils(commands.Cog):
@@ -23,4 +23,11 @@ class Utils(commands.Cog):
         except Exception as e:
             print(f"sync error: {e}")
         print("synced!")
+
+    @commands.command(
+        name="ping",
+    )
+    @commands.is_owner()
+    async def ping(self, ctx):
+        await ctx.send(f"Pong! ({self.bot.latency*1000}ms)")
             

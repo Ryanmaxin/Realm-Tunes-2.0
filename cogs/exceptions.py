@@ -26,7 +26,10 @@ class ExceptionHandler(commands.Cog):
             command_name = ctx.command.name
 
             embed = discord.Embed(title=f"Something went wrong with {command_name}", color=discord.Color.red())
-            await ctx.response.send_message(embed=embed)
+            try:
+                await ctx.response.send_message(embed=embed)
+            except:
+                await ctx.followup.send(embed=embed)
 
             error_type = type(error)
             error_traceback = error.__traceback__
