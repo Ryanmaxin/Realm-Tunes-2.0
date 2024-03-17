@@ -664,30 +664,6 @@ class Music(commands.Cog):
         await ctx.response.send_message("Added distortion... This may take a couple of seconds")
 
     @app_commands.command(
-        name="vaporwave",
-        description="Makes the current song vaporwave"
-    )
-    @commands.guild_only()
-    async def vaporwave_command(self, ctx: discord.Interaction) -> None:
-        player: wavelink.Player = ctx.guild.voice_client
-        if not player:
-            return
-        if not (await self.validate(ctx,player)):
-            return
-        
-        filters: wavelink.Filters = player.filters
-        
-        bands = [{"band": 1, "gain": 0.3},{"band": 0, "gain": 0.3}]
-        filters.equalizer.set(bands=bands)
-        filters.timescale.set(pitch=0.5)
-        filters.tremelo.set(depth= 0.3, frequency=14)
-
-
-        await player.set_filters(filters)
-
-        await ctx.response.send_message("Making vaporwave... This may take a couple of seconds")
-
-    @app_commands.command(
         name="bass_boost",
         description="Boosts the bass of the current audio"
     )
