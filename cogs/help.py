@@ -34,6 +34,12 @@ class Help(commands.Cog):
             embed.add_field(name='Volume', value= 'Sets the volume of Realm Tunes to the specified amount.', inline=False)
             embed.add_field(name='Current', value= 'Shows the song that is currently playing.', inline=False)
             embed.add_field(name='Restart', value= 'Begins playing the current song from the beginning.', inline=False)
-            embed.add_field(name='Modify', value= 'Set the current song to nightcore, slowed, or regular.', inline=False)
+            embed.add_field(name='Now Playing', value= 'Shows the currently playing song.', inline=False)
+
+            embed.add_field(name='Timescale', value= 'Set the current song to nightcore, slowed, regular, or custom.', inline=False)
+            embed.add_field(name='Distortion', value= 'Distort the current song.', inline=False)
+            embed.add_field(name='Instrumental', value= 'Makes the current song instrumental.', inline=False)
+            embed.add_field(name='EightD Audio', value= 'Makes the audio sound 8D.', inline=False)
+            embed.add_field(name='Bass Boost', value= 'Boosts the bass of the current audio', inline=False)
 
             await ctx.response.send_message(embed=embed,ephemeral=True)
