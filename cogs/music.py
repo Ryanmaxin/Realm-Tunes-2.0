@@ -400,7 +400,7 @@ class Music(commands.Cog):
         if player.paused:
             await ctx.response.send_message("Playback resumed")
         else:
-            await player.pause(True)
+            await player.resume(True)
             await ctx.response.send_message("Music is already unpaused")
 
     @app_commands.command(
@@ -794,5 +794,5 @@ class Music(commands.Cog):
 
         embed.set_footer(text=f'Song added by {str(author)}',icon_url=avatar)
 
-        await player.home.send(embed=embed)
+        await player.response.send(embed=embed)
     

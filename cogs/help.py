@@ -32,7 +32,6 @@ class Help(commands.Cog):
             embed.add_field(name='Repeat', value= 'Toggles on or off repeating the current queue.', inline=False)
             embed.add_field(name='Shuffle', value= 'Puts the current queue in a random order.', inline=False)
             embed.add_field(name='Volume', value= 'Sets the volume of Realm Tunes to the specified amount.', inline=False)
-            embed.add_field(name='Current', value= 'Shows the song that is currently playing.', inline=False)
             embed.add_field(name='Restart', value= 'Begins playing the current song from the beginning.', inline=False)
             embed.add_field(name='Now Playing', value= 'Shows the currently playing song.', inline=False)
 

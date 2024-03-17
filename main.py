@@ -58,5 +58,5 @@ async def main():
         await bot.start(password)
 
 if __name__ == "__main__":
-    # time.sleep(20)
+    time.sleep(5)
     asyncio.run(main())
