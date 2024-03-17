@@ -37,7 +37,7 @@ class Help(commands.Cog):
 
             embed.add_field(name='Timescale', value= 'Set the current song to nightcore, slowed, regular, or custom.', inline=False)
             embed.add_field(name='Distortion', value= 'Distort the current song.', inline=False)
-            embed.add_field(name='Instrumental', value= 'Makes the current song instrumental.', inline=False)
+            embed.add_field(name='Vaporwave', value= 'Makes the current song vaporwave.', inline=False)
             embed.add_field(name='EightD Audio', value= 'Makes the audio sound 8D.', inline=False)
             embed.add_field(name='Bass Boost', value= 'Boosts the bass of the current audio', inline=False)
 

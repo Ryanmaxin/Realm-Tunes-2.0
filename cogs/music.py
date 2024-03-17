@@ -575,7 +575,7 @@ class Music(commands.Cog):
             return
         elif percent > 100:
             embed = discord.Embed(title=f"Warning: setting volume over 100% is not recommended. Please be careful!", color=Color.red())
-            await ctx.followup.send(embed=embed)
+            await player.home.send(embed=embed)
         await player.set_volume(percent)
         await ctx.response.send_message(f"Set volume to {percent}%")
 
@@ -664,11 +664,11 @@ class Music(commands.Cog):
         await ctx.response.send_message("Added distortion... This may take a couple of seconds")
 
     @app_commands.command(
-        name="instrumental",
-        description="Makes the current song instrumental"
+        name="vaporwave",
+        description="Makes the current song vaporwave"
     )
     @commands.guild_only()
-    async def instrumental_command(self, ctx: discord.Interaction) -> None:
+    async def vaporwave_command(self, ctx: discord.Interaction) -> None:
         player: wavelink.Player = ctx.guild.voice_client
         if not player:
             return
@@ -676,17 +676,16 @@ class Music(commands.Cog):
             return
         
         filters: wavelink.Filters = player.filters
+        
+        bands = [{"band": 1, "gain": 0.3},{"band": 0, "gain": 0.3}]
+        filters.equalizer.set(bands=bands)
+        filters.timescale.set(pitch=0.5)
+        filters.tremelo.set(depth= 0.3, frequency=14)
 
-        filters.karaoke.set(
-            level=1.0,          # Setting the level to maximum (1.0) for full vocal removal effect
-            mono_level=1.0     # Setting mono_level to maximum (1.0) for full mono effect, which can help in removing center-panned vocals
-            # filter_band=1000.0, # Setting filter_band to a value that targets vocal frequencies (adjust as needed)
-            # filter_width=500.0  # Setting filter_width to a moderate value to encompass a range of vocal frequencies
-        )      # Keeping scale at default (optional)
 
         await player.set_filters(filters)
 
-        await ctx.response.send_message("Removing vocals... This may take a couple of seconds")
+        await ctx.response.send_message("Making vaporwave... This may take a couple of seconds")
 
     @app_commands.command(
         name="bass_boost",
@@ -710,7 +709,24 @@ class Music(commands.Cog):
             {"band": 12, "gain": -0.1}, {"band": 13, "gain": -0.1}, {"band": 14, "gain": -0.1}
         ]
 
-        filters.equalizer.set(bands=bands)   
+        bands2 = [
+            {"band": 0, "gain": 0.6},
+            {"band": 1, "gain": 0.67},
+            {"band": 2, "gain": 0.67},
+            {"band": 3, "gain": 0},
+            {"band": 4, "gain": -0.5},
+            {"band": 5, "gain": 0.15},
+            {"band": 6, "gain": -0.45},
+            {"band": 7, "gain": 0.23},
+            {"band": 8, "gain": 0.35},
+            {"band": 9, "gain": 0.45},
+            {"band": 10, "gain": 0.55},
+            {"band": 11, "gain": 0.6},
+            {"band": 12, "gain": 0.55},
+            {"band": 13, "gain": 0}
+        ]
+
+        filters.equalizer.set(bands=bands2)   
 
         await player.set_filters(filters)
 
