@@ -4,6 +4,17 @@
 
 <img width="745" alt="image" src="https://user-images.githubusercontent.com/90675771/236710016-529802d2-65b4-42ab-b03a-07a6a2686db1.png">
 
+## Compatiblity:
+
+Realm Tunes supports all major music platforms:
+
+- Youtube
+- Spotify
+- Mp3
+- Soundcloud
+- And many others!
+
+
 ## Tools Used:
 
 Realm Tunes was created using Python and the Discord.py API. On the backend I used Lavalink to retrieve the audio source (https://github.com/freyacodes/Lavalink), and Wavelink (https://wavelink.readthedocs.io/en/latest/index.html) which provides a Lavalink wrapper for Python.
