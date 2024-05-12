@@ -8,7 +8,8 @@
 
 Realm Tunes was created using Python and the Discord.py API. On the backend I used Lavalink to retrieve the audio source (https://github.com/freyacodes/Lavalink), and Wavelink (https://wavelink.readthedocs.io/en/latest/index.html) which provides a Lavalink wrapper for Python.
 
-Realm Tunes is hosted 24/7 on DigitalOcean (https://www.digitalocean.com) for $4/month. Both the Realm Tunes bot as well as the Lavalink server are run continuously with pm2 (https://pm2.keymetrics.io) on a remote Ubuntu server.
+Realm Tunes is hosted 24/7 on a linux server in Winnipeg, Manitoba. This server was setup by me and is running a headless ubunutu distribution
+Both the Realm Tunes bot as well as the Lavalink server are run continuously with systemctl.
 
 ## Changes from Realm Tunes 1.0
 
@@ -17,6 +18,16 @@ Realm Tunes 1.0 (https://github.com/Ryanmaxin/Realm-Tunes) was my first attempt 
 Using Lavalink opened up many additional opportunities for Realm Tunes as well. In addition to seamless streaming, Lavalink has volume and seeking built in, allowing me to use these features that otherwise would have been impossible with FFMPEG.
 
 I also changed my programming philosophy when approaching 2.0. Specifically, I took a much heavier object-orientated approach, whereas in 1.0, I was using functional programming, and I believe this change allowed me to better reason about my bot and will make it easier to add new features in the future.
+
+## Reflection
+
+I wrote most of the code for Realm Tunes in December 2022 after I had finished my fall coop term and before I got busy with school in my upcoming academic term. I couldn't fully finish here, so I spent much of the Winter reading week, plus occasional weekends here and there, finalizing the bot.
+
+Looking back, I'm glad I spent a lot more time planning out the program's layout as it paid for itself many times over in time saved while debugging or adding new features. 
+
+Realm Tunes 2.0 is my first personal project which I have taken the effort to host continuously, which has proven to be a lot more difficult then I expected, but I'm happy to have gotten this experience. 
+
+I have been continually updating Realm Tunes, usually every few months to keep up with changes in Discord.py, LavaLink or Wavelink, and to add requested features.
 
 ## Current Commands:
 
@@ -100,11 +111,3 @@ Shows the song that is currently playing
 Begins playing the current song from the beginning
 
 ![ezgif-1-3b0c13ce69](https://user-images.githubusercontent.com/90675771/236713872-6b9a4ef2-859a-4ca5-9165-4cfdfda27d6d.gif)
-
-## Reflection
-
-I wrote most of the code for Realm Tunes in December 2022 after I had finished my fall coop term and before I got busy with school in my upcoming academic term. I couldn't fully finish here, so I spent much of the Winter reading week, plus occasional weekends here and there, finalizing the bot.
-
-Looking back, I'm glad I spent a lot more time planning out the program's layout as it paid for itself many times over in time saved while debugging or adding new features. 
-
-Realm Tunes 2.0 is my first personal project which I have taken the effort to host on a dedicated platform, and I'm happy to have gotten this experience. 
