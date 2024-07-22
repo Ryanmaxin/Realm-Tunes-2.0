@@ -9,3 +9,4 @@ Lavalink_older.jar
 Lavalink.jar
 .DS_STORE
 venv
+plugins/*
