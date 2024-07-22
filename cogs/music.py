@@ -373,7 +373,7 @@ class Music(commands.Cog):
     
     @app_commands.command(
         name="pause",
-        description="Pauses the music, if it is unpaused."
+        description="Toggle between pausing/unpausing the music"
     )
     @commands.guild_only()
     async def pause_command(self, ctx: discord.Interaction):
@@ -382,27 +382,11 @@ class Music(commands.Cog):
         if not (await self.validate(ctx,player)):
             return
         if player.paused:
-            await ctx.response.send_message("Music is already paused")
+            await player.pause(False)
+            await ctx.response.send_message("Playback resumed")
         else:
             await player.pause(True)
             await ctx.response.send_message("Playback paused")
-    
-    @app_commands.command(
-        name="resume",
-        description="unpauses the music, if it is paused."
-    )
-    @commands.guild_only()
-    async def resume_command(self, ctx: discord.Interaction):
-        player: wavelink.Player = ctx.guild.voice_client
-
-        if not (await self.validate(ctx,player)):
-            return
-        if player.paused:
-            await ctx.response.send_message("Playback resumed")
-        else:
-            await player.resume(True)
-            await ctx.response.send_message("Music is already unpaused")
-
     @app_commands.command(
         name="skip",
         description="Skips the current song."
@@ -753,7 +737,7 @@ class Music(commands.Cog):
         
         track = player.current
         if not track:
-            ctx.response.send_message("No song is currently playing")
+            await ctx.response.send_message("No song is currently playing")
         title = track.title
         duration = self.convertDuration(track.length)
         link = track.uri
@@ -776,5 +760,5 @@ class Music(commands.Cog):
 
         embed.set_footer(text=f'Song added by {str(author)}',icon_url=avatar)
 
-        await player.response.send(embed=embed)
+        await ctx.response.send_message(embed=embed)
     

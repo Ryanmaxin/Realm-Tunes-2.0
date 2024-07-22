@@ -12,7 +12,6 @@ class Help(commands.Cog):
         description="Displays list of available commands"
     )
     async def help_command(self,ctx:discord.Interaction):
-            author = ctx.user
             embed = discord.Embed(
                 title = "Realm Tunes Command Guide",
                 colour = discord.Colour.yellow()
@@ -22,8 +21,7 @@ class Help(commands.Cog):
             embed.add_field(name='Play', value= 'Realm Tunes will immediately queue up the query if it is a url/playlist, otherwise it will search for the query on YouTube and create a menu where you can choose a song.', inline=False)
             embed.add_field(name='Play Now', value= 'Identical to Play, except the desired song will be play immediately even if there is another song playing.', inline=False)
             embed.add_field(name='Clear', value='Clears the queue and ends the current song.', inline=False)
-            embed.add_field(name='Pause', value= 'Pauses the music.', inline=False)
-            embed.add_field(name='Resume', value= 'Resumes the music.', inline=False)
+            embed.add_field(name='Pause', value= 'Toggle between pausing and unpausing the music.', inline=False)
             embed.add_field(name='Skip', value= 'Skips the current song.', inline=False)
             embed.add_field(name='Queue', value= 'Shows the current queue. Add a number to select specific page (when more then 10 songs).', inline=False)
             embed.add_field(name='Loop', value= 'Toggles on or off looping. looping repeats the current song after it ends.', inline=False)
@@ -34,7 +32,6 @@ class Help(commands.Cog):
             embed.add_field(name='Volume', value= 'Sets the volume of Realm Tunes to the specified amount.', inline=False)
             embed.add_field(name='Restart', value= 'Begins playing the current song from the beginning.', inline=False)
             embed.add_field(name='Now Playing', value= 'Shows the currently playing song.', inline=False)
-
             embed.add_field(name='Timescale', value= 'Set the current song to nightcore, slowed, regular, or custom.', inline=False)
             embed.add_field(name='Distortion', value= 'Distort the current song.', inline=False)
             embed.add_field(name='EightD Audio', value= 'Makes the audio sound 8D.', inline=False)
