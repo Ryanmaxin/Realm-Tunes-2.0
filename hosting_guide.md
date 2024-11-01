@@ -15,7 +15,7 @@ This is a short hosting guide to help you host Realm Tunes on your own server! P
 
 2. Create an `application.yml` file in the cloned repo for the Lavalink server (this server will be what streams music to the bot so that it can play songs). Since this file contains sensitive info, I can't share my exact file. You can find an example file [here](https://github.com/lavalink-devs/Lavalink/blob/master/LavalinkServer/application.yml.example), and you can learn more about the Lavalink server [here](https://github.com/lavalink-devs/Lavalink).
 
-3. Create a .env in the cloned repo for private information. By default you will need the following 3 keys populated for Realm Tunes to work:
+3. Create a `.env` file in the cloned repo for private information. By default you will need the following 3 keys populated for Realm Tunes to work:
 
 ```
 BOT_KEY={Your bot key here, you need to get this from the Discord Developer Portal}
@@ -78,4 +78,4 @@ That's all! That bot should be running and used for playing music on Discord now
 ## Additional Notes:
 
 - You can shutdown the bot and server with /shutdown.sh
-- You can view the logs for Realm Tunes or Lavalink with `/rt_journal` and `ll_journal`, respectively
+- You can view the logs for Realm Tunes or Lavalink with `/rt_journal` and `/ll_journal`, respectively
