@@ -24,7 +24,7 @@ Both the Realm Tunes bot as well as the Lavalink server are run continuously wit
 
 ## Changes from Realm Tunes 1.0
 
-Realm Tunes 1.0 (https://github.com/Ryanmaxin/Realm-Tunes) was my first attempt to create a music bot. Before I knew about Lavalink, I used tools like YoutubeDL and FFMPEG to retrieve and play audio sources. These tools were not meant to stream music in real-time in the way I was implementing them, and as such, they had severe speed and scaling issues. I knew trying to build further upon these tools would be a mistake and that I needed to find a better way to stream audio, which Lavalink came in handy.
+Realm Tunes 1.0 (https://github.com/Ryanmaxin/Realm-Tunes) was my first attempt to create a music bot. Before I knew about Lavalink, I used tools like YoutubeDL and FFMPEG to retrieve and play audio sources. These tools were not meant to stream music in real-time in the way I was implementing them, and as such, they had severe speed and scaling issues. I knew trying to build further upon these tools would be a mistake and that I needed to find a better way to stream audio, which Lavalink came in handy for.
 
 Using Lavalink opened up many additional opportunities for Realm Tunes as well. In addition to seamless streaming, Lavalink has volume and seeking built in, allowing me to use these features that otherwise would have been impossible with FFMPEG.
 
