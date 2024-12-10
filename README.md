@@ -19,7 +19,7 @@ Realm Tunes supports all major music platforms:
 
 Realm Tunes was created using Python and the Discord.py API. On the backend I used Lavalink to retrieve the audio source (https://github.com/freyacodes/Lavalink), and Wavelink (https://wavelink.readthedocs.io/en/latest/index.html) which provides a Lavalink wrapper for Python.
 
-Realm Tunes is hosted 24/7 on a linux server in Winnipeg, Manitoba. This server was setup by me and is running a headless ubunutu distribution
+Realm Tunes is hosted 24/7 on a linux server in Winnipeg, Manitoba. This server was setup by me and is running a headless Ubuntu distribution.
 Both the Realm Tunes bot as well as the Lavalink server are run continuously with systemctl.
 
 ## Changes from Realm Tunes 1.0
