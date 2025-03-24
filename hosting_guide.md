@@ -14,8 +14,8 @@ If the bot has suddenly stopped working, there are several steps you can take (i
 
 1. **Restart Realm Tunes bot and the Lavalink Server.** You can use `shutdown.sh` and `startup.sh` to do this.
 2. **Get the latest version of `Lavalink.jar`.** You can find the latest version [here](https://github.com/lavalink-devs/Lavalink/releases). All you need to do is download this the file `Lavalink.jar` and replace the existing file in your bot directory.
-3. **Update plugins. ** Out of date plugins can break the Lavalink server. All you need to do to update them is search for each one online, find the most recent version, and replace the version number in your `application.yml`.
-4. **Create a new youtube account. ** If you added an account into `application.yml`, it may get banned if Youtube recognizes that it is a streaming bot. In this case you should create a new account and add the new details to `application.yml`. MAKE SURE IT IS A BURNER ACCOUNT THAT YOU DON'T MIND GETTING BANNED 
+3. **Update plugins.** Out of date plugins can break the Lavalink server. All you need to do to update them is search for each one online, find the most recent version, and replace the version number in your `application.yml`.
+4. **Create a new youtube account.** If you added an account into `application.yml`, it may get banned if Youtube recognizes that it is a streaming bot. In this case you should create a new account and add the new details to `application.yml`. MAKE SURE IT IS A BURNER ACCOUNT THAT YOU DON'T MIND GETTING BANNED 
 
 Feel free to reach out to me (`ryebot` on Discord) if you are having trouble with the setup.
 
