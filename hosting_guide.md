@@ -24,9 +24,18 @@ Feel free to reach out to me (`ryebot` on Discord) if you are having trouble wit
 1. Clone this repo onto your local computer with the command :
    `git clone https://github.com/Ryanmaxin/Realm-Tunes-2.0.git`
 
-2. Create an `application.yml` file in the cloned repo for the Lavalink server (this server will be what streams music to the bot so that it can play songs). Since this file contains sensitive info, I can't share my exact file. You can find an example file [here](https://github.com/lavalink-devs/Lavalink/blob/master/LavalinkServer/application.yml.example), and you can learn more about the Lavalink server [here](https://github.com/lavalink-devs/Lavalink). Depending on your use case you will probably need to add some plugins as well.
+2. Create an `application.yml` file in the cloned repo for the Lavalink server (this server will be what streams music to the bot so that it can play songs). Since this file contains sensitive info, I can't share my exact file. You can find an example file [here](https://github.com/lavalink-devs/Lavalink/blob/master/LavalinkServer/application.yml.example), and you can learn more about the Lavalink server [here](https://github.com/lavalink-devs/Lavalink). Depending on your use case you will probably need to add some plugins as well. Here are the ones I use:
+```
+lavalink:
+  plugins:
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.3.0"
+      snapshot: false
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.11.3"
+      snapshot: false
+    - dependency: "com.github.topi314.lavasearch:lavasearch-plugin:1.0.0"
+```
 
-3. Create a `.env` file in the cloned repo for private information. By default you will need the following 3 keys populated for Realm Tunes to work:
+4. Create a `.env` file in the cloned repo for private information. By default you will need the following 3 keys populated for Realm Tunes to work:
 
 ```
 BOT_KEY={Your bot key here, you need to get this from the Discord Developer Portal}
